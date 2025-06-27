@@ -70,102 +70,104 @@
     </div>
     <div class="result-box hidden" id="result">
         <div id="status"></div>
-        <div class="ip-info" id="tcpInfo"></div>
         <div class="ip-info" id="udpInfo"></div>
         <div class="ip-info" id="conclusion"></div>
     </div>
 </div>
 
 <script>
-(async function() {
+(function() {
     const loader = document.getElementById('loader');
     const result = document.getElementById('result');
     const status = document.getElementById('status');
-    const tcpInfo = document.getElementById('tcpInfo');
     const udpInfo = document.getElementById('udpInfo');
     const conclusion = document.getElementById('conclusion');
     
-    // Get visible TCP IP (from HTTP headers)
-    async function getTCPIP() {
-        try {
-            const response = await fetch('https://api.ipify.org?format=json');
-            const data = await response.json();
-            return data.ip;
-        } catch (e) {
-            return "unknown";
-        }
-    }
-    
-    // Detect WebRTC UDP leaks
-    async function detectUDPLeak() {
+    // Fast WebRTC detection with timeout
+    function detectUDPLeak() {
         return new Promise((resolve) => {
             const leakedIPs = [];
             const pc = new RTCPeerConnection({
-                iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+                iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+                iceCandidatePoolSize: 0  // Уменьшаем размер пула кандидатов
             });
+
+            let isResolved = false;
+            const timeout = setTimeout(() => {
+                if (!isResolved) {
+                    pc.close();
+                    resolve([]);
+                    isResolved = true;
+                }
+            }, 1000);  // Таймаут 1 секунда для мобильных устройств
 
             pc.onicecandidate = (event) => {
                 if (!event.candidate) {
-                    pc.close();
-                    resolve(leakedIPs);
+                    clearTimeout(timeout);
+                    if (!isResolved) {
+                        resolve(leakedIPs);
+                        isResolved = true;
+                    }
                     return;
                 }
                 
                 const candidate = event.candidate.candidate;
-                const ipRegex = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/gi;
+                if (candidate.indexOf('udp') === -1) return;  // Фильтр только UDP
+                
+                const ipRegex = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/;
                 const match = candidate.match(ipRegex);
                 
                 if (match) {
                     const ip = match[0];
-                    // Filter private IPs
-                    if (!ip.startsWith('192.168.') && 
-                        !ip.startsWith('10.') && 
-                        !ip.startsWith('172.16.') &&
-                        ip !== '127.0.0.1') {
+                    // Фильтр приватных IP
+                    if (!/^(192\.168|10\.|172\.(1[6-9]|2[0-9]|3[0-1])|127\.|::1|fc00::)/i.test(ip)) {
                         leakedIPs.push(ip);
                     }
                 }
             };
 
             pc.createDataChannel("");
-            pc.createOffer()
-                .then(offer => pc.setLocalDescription(offer))
-                .catch(e => {
-                    console.error("WebRTC error:", e);
-                    resolve([]);
-                });
+            pc.createOffer({
+                offerToReceiveAudio: false,  // Отключаем аудио для ускорения
+                offerToReceiveVideo: false   // Отключаем видео для ускорения
+            })
+            .then(offer => pc.setLocalDescription(offer))
+            .catch(() => {
+                clearTimeout(timeout);
+                if (!isResolved) resolve([]);
+            });
         });
     }
 
-    // Main detection logic
-    try {
-        const tcpIP = await getTCPIP();
-        const udpIPs = await detectUDPLeak();
-        const uniqueUDPIPs = [...new Set(udpIPs)];
-        
-        // Remove loader
-        loader.classList.add('hidden');
-        result.classList.remove('hidden');
-        
-        // Display results
-        tcpInfo.textContent = `Your IP by TCP: ${tcpIP}`;
-        
-        if (uniqueUDPIPs.length > 0) {
-            status.innerHTML = '<span class="warning">PROXY DETECTED!</span>';
-            udpInfo.textContent = `UDP: ${uniqueUDPIPs.join(', ')}`;
-            conclusion.textContent = "WebRTC UDP leak detected! Real IP exposed.";
-        } else {
-            status.innerHTML = '<span class="warning">UDP BLOCKED!</span>';
-            udpInfo.textContent = "UDP: No leaks detected";
-            conclusion.innerHTML = `UDP traffic blocked, which may mean:
+    // Main function with performance optimizations
+    async function runDetection() {
+        try {
+            const udpIPs = await detectUDPLeak();
+            const uniqueUDPIPs = [...new Set(udpIPs)];
+            
+            loader.classList.add('hidden');
+            result.classList.remove('hidden');
+            
+            if (uniqueUDPIPs.length > 0) {
+                status.innerHTML = '<span class="warning">PROXY DETECTED!</span>';
+                udpInfo.textContent = `UDP: ${uniqueUDPIPs.join(', ')}`;
+                conclusion.textContent = "WebRTC UDP leak detected! Real IP exposed.";
+            } else {
+                status.innerHTML = '<span class="warning">UDP BLOCKED!</span>';
+                udpInfo.textContent = "UDP: No leaks detected";
+                conclusion.innerHTML = `UDP traffic blocked, which may mean:
 • Using HTTP/SOCKS5 proxy without UDP support
 • Incorrect network configuration
 • WebRTC completely disabled`;
+            }
+        } catch (e) {
+            status.textContent = "Detection failed";
+            conclusion.textContent = "Error: " + e.message;
         }
-    } catch (e) {
-        status.textContent = "Detection failed";
-        conclusion.textContent = "Error: " + e.message;
     }
+
+    // Запускаем немедленно при загрузке
+    runDetection();
 })();
 </script>
 </body>
