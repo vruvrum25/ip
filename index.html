@@ -1,147 +1,99 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>WebRTC IP Leak Detector</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ID Information</title>
     <style>
-        /* Стили остаются без изменений */
         body {
-            font-size: 16px;
-            line-height: 1.6;
-            background-color: #000;
-            color: #0a5;
-            font-family: "Courier New", Courier, monospace;
             margin: 0;
             padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: white;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         .container {
-            max-width: 800px;
-            margin: 0 auto;
+            max-width: 600px;
+            width: 100%;
             padding: 20px;
         }
-        /* ... остальные стили ... */
+        .info-item {
+            margin: 15px 0;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 18px;
+        }
+        .info-label {
+            font-weight: bold;
+            display: inline-block;
+            width: 120px;
+        }
+        #loader {
+            text-align: center;
+            padding: 30px;
+        }
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="logo">ZL0Y<span>TEAM</span></div>
-    <h1>Check your browser leaking IP</h1>
-    <div class="loader" id="loadingIndicator">
-        <div class="spinner"></div>
-        <div>Please wait...</div>
+    <div class="container">
+        <div id="loader">Загрузка данных...</div>
+        <div id="result" style="display: none;">
+            <div class="info-item">
+                <span class="info-label">Visitor ID:</span>
+                <span id="visitorId"></span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Request ID:</span>
+                <span id="requestId"></span>
+            </div>
+        </div>
     </div>
-    <div class="important-note" id="finalNote"></div>
-    <a href="https://t.me/Zl0yTeam" class="telegram-link" target="_blank">Join our https://t.me/Zl0yTeam</a>
-</div>
 
-<script>
-// Расшифрованный и оптимизированный скрипт
-(function() {
-    const loader = document.getElementById('loadingIndicator');
-    const resultDisplay = document.getElementById('finalNote');
+    <!-- Загружаем библиотеку через альтернативный CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs-pro@3.11.10/dist/fp.min.js"></script>
     
-    // Показать лоадер
-    loader.classList.add('active');
-    
-    // 1. Получение TCP IP (видимый IP)
-    async function getTCPIP() {
-        try {
-            const response = await fetch('https://api.ipify.org?format=json');
-            const data = await response.json();
-            return data.ip;
-        } catch (e) {
-            return "unknown";
-        }
-    }
-    
-    // 2. Детекция WebRTC утечек
-    function detectWebRTCLeak() {
-        return new Promise(resolve => {
-            const ips = new Set();
-            const pc = new RTCPeerConnection({
-                iceServers: [
-                    { urls: "stun:stun.l.google.com:19302" },
-                    { urls: "stun:stun1.l.google.com:19302" },
-                    { urls: "stun:stun2.l.google.com:19302" },
-                    { urls: "stun:stun3.l.google.com:19302" },
-                    { urls: "stun:stun4.l.google.com:19302" }
-                ],
-                iceCandidatePoolSize: 0  // Оптимизация для мобильных
-            });
-            
-            // Таймаут для мобильных устройств
-            const timeout = setTimeout(() => {
-                if (ips.size === 0) resolve({ leakedIPs: [], status: 'timeout' });
-                pc.close();
-            }, 2000);
-            
-            pc.onicecandidate = e => {
-                if (!e.candidate) {
-                    clearTimeout(timeout);
-                    resolve({ leakedIPs: [...ips], status: 'completed' });
-                    pc.close();
-                    return;
+    <script>
+        const FP_API_KEY = 'Ki8goVOk05JAcbWpUsmw';
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // Проверяем доступность FingerprintJS
+                if (typeof FingerprintJS === 'undefined') {
+                    throw new Error('Библиотека FingerprintJS не загружена');
                 }
                 
-                const candidate = e.candidate.candidate;
-                const ipRegex = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/i;
-                const match = candidate.match(ipRegex);
+                // Инициализируем с API ключом
+                const fp = await FingerprintJS.load({
+                    apiKey: FP_API_KEY,
+                    region: 'eu'
+                });
                 
-                if (match) {
-                    const ip = match[0];
-                    // Фильтр приватных IP
-                    if (!ip.startsWith('192.168.') && 
-                        !ip.startsWith('10.') && 
-                        !ip.startsWith('172.16.') &&
-                        ip !== '127.0.0.1' &&
-                        !ip.includes('::1')) {
-                        ips.add(ip);
-                    }
-                }
-            };
-            
-            pc.createDataChannel("");
-            pc.createOffer({
-                offerToReceiveAudio: false,
-                offerToReceiveVideo: false
-            })
-            .then(offer => pc.setLocalDescription(offer))
-            .catch(() => resolve({ leakedIPs: [], status: 'error' }));
-        });
-    }
-    
-    // 3. Анализ результатов
-    async function runDetection() {
-        const tcpIP = await getTCPIP();
-        const { leakedIPs, status } = await detectWebRTCLeak();
-        
-        let message = '';
-        
-        if (status === 'timeout') {
-            message = `UDP blocked!\nYour IP by TCP: ${tcpIP}\n\nUDP traffic blocked, which may mean:\n• Using HTTP/SOCKS5 proxy without UDP support\n• Incorrect network equipment configuration`;
-        } 
-        else if (leakedIPs.length > 0) {
-            message = `Proxy detected!\nTCP: ${tcpIP}\nUDP: ${leakedIPs.join(', ')}`;
-            
-            // Дополнительный анализ
-            if (leakedIPs.some(ip => ip !== tcpIP)) {
-                message += "\n\nREAL IP EXPOSED!";
+                // Получаем данные
+                const result = await fp.get({ extendedResult: true });
+                
+                // Отображаем результат
+                document.getElementById('visitorId').textContent = result.visitorId;
+                document.getElementById('requestId').textContent = result.requestId;
+                
+                // Переключаем видимость элементов
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('result').style.display = 'block';
+            } catch (error) {
+                // Улучшенная обработка ошибок
+                document.getElementById('loader').innerHTML = `
+                    <div style="color: #e74c3c; text-align: center;">
+                        <h3>Ошибка загрузки данных</h3>
+                        <p>${error.message || 'Неизвестная ошибка'}</p>
+                        <p>Попробуйте обновить страницу</p>
+                    </div>
+                `;
+                console.error('FPJS Error:', error);
             }
-        } 
-        else {
-            message = `Direct connection\nTCP: ${tcpIP}\nNo WebRTC leaks detected`;
-        }
-        
-        resultDisplay.textContent = message;
-        loader.classList.remove('active');
-    }
-    
-    // Запуск детекции
-    runDetection().catch(e => {
-        resultDisplay.textContent = `Error: ${e.message}`;
-        loader.classList.remove('active');
-    });
-})();
-</script>
+        });
+    </script>
 </body>
 </html>
