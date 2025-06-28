@@ -53,46 +53,78 @@
         </div>
     </div>
 
-    <!-- Загружаем библиотеку через альтернативный CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs-pro@3.11.10/dist/fp.min.js"></script>
-    
     <script>
-        const FP_API_KEY = 'Ki8goVOk05JAcbWpUsmw';
-        
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                // Проверяем доступность FingerprintJS
-                if (typeof FingerprintJS === 'undefined') {
-                    throw new Error('Библиотека FingerprintJS не загружена');
-                }
+        document.addEventListener('DOMContentLoaded', () => {
+            const FP_API_KEY = 'Ki8goVOk05JAcbWpUsmw';
+            
+            // Создаем Web Worker из строки кода
+            const workerScript = `
+                importScripts('https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs-pro@3.11.10/dist/fp.min.js');
                 
-                // Инициализируем с API ключом
-                const fp = await FingerprintJS.load({
-                    apiKey: FP_API_KEY,
-                    region: 'eu'
+                self.addEventListener('message', async (e) => {
+                    if (e.data.action === 'getFingerprint') {
+                        try {
+                            const fp = await FingerprintJS.load({
+                                apiKey: e.data.apiKey,
+                                region: 'eu'
+                            });
+                            
+                            const result = await fp.get({ extendedResult: true });
+                            self.postMessage({
+                                status: 'success',
+                                data: {
+                                    visitorId: result.visitorId,
+                                    requestId: result.requestId
+                                }
+                            });
+                        } catch (error) {
+                            self.postMessage({
+                                status: 'error',
+                                message: error.message || 'Ошибка при получении данных'
+                            });
+                        }
+                    }
                 });
-                
-                // Получаем данные
-                const result = await fp.get({ extendedResult: true });
-                
-                // Отображаем результат
-                document.getElementById('visitorId').textContent = result.visitorId;
-                document.getElementById('requestId').textContent = result.requestId;
-                
-                // Переключаем видимость элементов
-                document.getElementById('loader').style.display = 'none';
-                document.getElementById('result').style.display = 'block';
-            } catch (error) {
-                // Улучшенная обработка ошибок
-                document.getElementById('loader').innerHTML = `
+            `;
+            
+            const blob = new Blob([workerScript], { type: 'application/javascript' });
+            const worker = new Worker(URL.createObjectURL(blob));
+            
+            worker.postMessage({
+                action: 'getFingerprint',
+                apiKey: FP_API_KEY
+            });
+            
+            worker.onmessage = (e) => {
+                if (e.data.status === 'success') {
+                    document.getElementById('visitorId').textContent = e.data.data.visitorId;
+                    document.getElementById('requestId').textContent = e.data.data.requestId;
+                    document.getElementById('loader').style.display = 'none';
+                    document.getElementById('result').style.display = 'block';
+                } else {
+                    document.getElementById('loader').innerHTML = \`
+                        <div style="color: #e74c3c; text-align: center;">
+                            <h3>Ошибка загрузки данных</h3>
+                            <p>\${e.data.message || 'Неизвестная ошибка'}</p>
+                            <p>Попробуйте обновить страницу</p>
+                        </div>
+                    \`;
+                    console.error('FPJS Error:', e.data.message);
+                }
+                worker.terminate();
+            };
+            
+            worker.onerror = (error) => {
+                document.getElementById('loader').innerHTML = \`
                     <div style="color: #e74c3c; text-align: center;">
-                        <h3>Ошибка загрузки данных</h3>
-                        <p>${error.message || 'Неизвестная ошибка'}</p>
+                        <h3>Ошибка в Web Worker</h3>
+                        <p>\${error.message || 'Неизвестная ошибка воркера'}</p>
                         <p>Попробуйте обновить страницу</p>
                     </div>
-                `;
-                console.error('FPJS Error:', error);
-            }
+                \`;
+                console.error('Worker Error:', error);
+                worker.terminate();
+            };
         });
     </script>
 </body>
