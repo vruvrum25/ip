@@ -54,32 +54,21 @@
     </div>
 
     <script>
+        const FP_API_KEY = 'Ki8goVOk05JAcbWpUsmw';
+        
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Импортируем библиотеку FingerprintJS
-                const FingerprintJS = await import('https://spiritguidetg.ru/NPf7MrGIB7Xfd50d/J3QcYpxrmV0uEmiz?apiKey=Ki8goVOk05JAcbWpUsmw');
-                
-                // Загружаем агент с настройками
-                const fp = await FingerprintJS.load({
-                    endpoint: [
-                        "https://spiritguidetg.ru/NPf7MrGIB7Xfd50d/NcTotKlhGHxdV9WH?region=eu",
-                        FingerprintJS.defaultEndpoint
-                    ],
-                    region: "eu"
-                });
-                
-                // Получаем данные с расширенным результатом
+                // Замененная ссылка для загрузки скрипта
+                const FingerprintJS = await import("https://spiritguidetg.ru/NPf7MrGIB7Xfd50d/J3QcYpxrmV0uEmiz?apiKey=Ki8goVOk05JAcbWpUsmw");
+                const fp = await FingerprintJS.load({ region: 'eu' });
                 const result = await fp.get({ extendedResult: true });
                 
-                // Отображаем полученные данные
                 document.getElementById('visitorId').textContent = result.visitorId;
                 document.getElementById('requestId').textContent = result.requestId;
                 
-                // Переключаем отображение
                 document.getElementById('loader').style.display = 'none';
                 document.getElementById('result').style.display = 'block';
             } catch (error) {
-                // Обработка ошибок
                 document.getElementById('loader').innerHTML = `
                     <div style="color: #e74c3c; text-align: center;">
                         <h3>Ошибка загрузки данных</h3>
