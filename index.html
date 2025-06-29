@@ -3,89 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Сайт с кастомным событием GTM</title>
-    <!-- Google Tag Manager -->
-    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-TZ3FZTNB');</script>
-    <!-- End Google Tag Manager -->
-    
+    <title>ID Information</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
+            margin: 0;
             padding: 20px;
-            line-height: 1.6;
-        }
-        button {
-            background: #4285f4;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            font-size: 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        button:hover {
-            background: #3367d6;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: white;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         .container {
+            max-width: 600px;
+            width: 100%;
+            padding: 20px;
+        }
+        .info-item {
+            margin: 15px 0;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 18px;
+        }
+        .info-label {
+            font-weight: bold;
+            display: inline-block;
+            width: 120px;
+        }
+        #loader {
             text-align: center;
-            margin-top: 50px;
-        }
-        .event-status {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 4px;
-            display: none;
-        }
-        .success {
-            background: #e6f4ea;
-            color: #137333;
-            border: 1px solid #34a853;
+            padding: 30px;
         }
     </style>
 </head>
 <body>
-    <!-- Google Tag Manager (noscript) -->
-    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TZ3FZTNB"
-    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-    <!-- End Google Tag Manager (noscript) -->
-
     <div class="container">
-        <h1>Идентификация посетителя</h1>
-        <p>Нажмите кнопку ниже, чтобы отправить кастомное событие в Google Tag Manager</p>
-        
-        <button id="identifyBtn">Идентифицировать посетителя</button>
-        
-        <div id="eventStatus" class="event-status">
-            Событие успешно отправлено в Google Tag Manager!
+        <div id="loader">Загрузка данных...</div>
+        <div id="result" style="display: none;">
+            <div class="info-item">
+                <span class="info-label">Visitor ID:</span>
+                <span id="visitorId"></span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Request ID:</span>
+                <span id="requestId"></span>
+            </div>
         </div>
     </div>
 
     <script>
-        document.getElementById('identifyBtn').addEventListener('click', function() {
-            // Отправка кастомного события в GTM
-            window.dataLayer = window.dataLayer || [];
-            dataLayer.push({
-                'event': 'identifyVisitor',
-                'visitorType': 'registered', // Пример дополнительного параметра
-                'identificationTime': new Date().toISOString() // Пример временной метки
-            });
+        const FP_API_KEY = 'Ki8goVOk05JAcbWpUsmw';
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const loader = document.getElementById('loader');
+            const resultContainer = document.getElementById('result');
             
-            // Показываем подтверждение
-            const statusElement = document.getElementById('eventStatus');
-            statusElement.style.display = 'block';
-            statusElement.className = 'event-status success';
-            
-            // Скрываем сообщение через 3 секунды
-            setTimeout(() => {
-                statusElement.style.display = 'none';
-            }, 3000);
+            const handleError = (error) => {
+                console.error('FingerprintJS Error:', error);
+                loader.innerHTML = `
+                    <div style="color: #e74c3c; text-align: center;">
+                        <h3>Ошибка загрузки данных</h3>
+                        <p>${error.message || error}</p>
+                        <p>Попробуйте обновить страницу</p>
+                    </div>
+                `;
+            };
+
+            try {
+                // 1. Загрузка скрипта
+                const script = document.createElement('script');
+                script.src = 'https://opencdn.fpjs.sh/fingerprintjs-pro-gtm/v1/iife.min.js';
+                
+                script.onload = () => {
+                    console.log('FingerprintJS: Script loaded successfully.');
+                    
+                    // 2. Конфигурация параметров
+                    const loadOptions = {
+                        apiKey: FP_API_KEY,
+                        integrationInfo: 'fingerprintjs-pro-gtm-template/1.0.0',
+                        region: 'eu'
+                    };
+                    
+                    const getOptions = {
+                        extendedResult: true
+                    };
+                    
+                    // 3. Инициализация библиотеки
+                    window.FingerprintjsProGTM.load(loadOptions, () => {
+                        console.log('FingerprintJS: Library initialized.');
+                        
+                        // 4. Получение данных
+                        window.FingerprintjsProGTM.get(getOptions, (result) => {
+                            console.log('FingerprintJS: Identification complete:', result);
+                            
+                            // 5. Отображение результатов
+                            document.getElementById('visitorId').textContent = result.visitorId;
+                            document.getElementById('requestId').textContent = result.requestId;
+                            
+                            loader.style.display = 'none';
+                            resultContainer.style.display = 'block';
+                        }, (error) => {
+                            handleError(new Error(`Identification failed: ${error.message}`));
+                        });
+                    }, (error) => {
+                        handleError(new Error(`Initialization failed: ${error.message}`));
+                    });
+                };
+                
+                script.onerror = (error) => {
+                    handleError(new Error('Script load failed. Check CDN availability.'));
+                };
+                
+                document.head.appendChild(script);
+                
+            } catch (error) {
+                handleError(error);
+            }
         });
     </script>
 </body>
