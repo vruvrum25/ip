@@ -37,10 +37,6 @@
             padding: 30px;
         }
     </style>
-    <!-- Добавлен SRI-хеш для безопасности -->
-    <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs-pro@3.11.10/dist/fp.min.js" 
-            integrity="sha256-4DDGUZ1EGSSFsLgALHYXQxS6Fo/7QAonjWE5Ev0SymU=" 
-            crossorigin="anonymous"></script>
 </head>
 <body>
     <div class="container">
@@ -58,24 +54,32 @@
     </div>
 
     <script>
-        const FP_API_KEY = 'Ki8goVOk05JAcbWpUsmw';
-        
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Используем глобально доступный FingerprintJS после загрузки скрипта
+                // Импортируем библиотеку FingerprintJS
+                const FingerprintJS = await import('https://spiritguidetg.ru/NPf7MrGIB7Xfd50d/J3QcYpxrmV0uEmiz?apiKey=Ki8goVOk05JAcbWpUsmw');
+                
+                // Загружаем агент с настройками
                 const fp = await FingerprintJS.load({
-                    apiKey: FP_API_KEY,
-                    region: 'eu'
+                    endpoint: [
+                        "https://spiritguidetg.ru/NPf7MrGIB7Xfd50d/NcTotKlhGHxdV9WH?region=eu",
+                        FingerprintJS.defaultEndpoint
+                    ],
+                    region: "eu"
                 });
                 
+                // Получаем данные с расширенным результатом
                 const result = await fp.get({ extendedResult: true });
                 
+                // Отображаем полученные данные
                 document.getElementById('visitorId').textContent = result.visitorId;
                 document.getElementById('requestId').textContent = result.requestId;
                 
+                // Переключаем отображение
                 document.getElementById('loader').style.display = 'none';
                 document.getElementById('result').style.display = 'block';
             } catch (error) {
+                // Обработка ошибок
                 document.getElementById('loader').innerHTML = `
                     <div style="color: #e74c3c; text-align: center;">
                         <h3>Ошибка загрузки данных</h3>
