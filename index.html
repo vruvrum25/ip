@@ -3,81 +3,153 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ID Information</title>
+    <title>FingerprintJS Result</title>
     <style>
         body {
             margin: 0;
             padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: Arial, sans-serif;
             background: white;
             color: #333;
-            min-height: 100vh;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
         }
+        
         .container {
-            max-width: 600px;
+            max-width: 800px;
             width: 100%;
-            padding: 20px;
         }
-        .info-item {
-            margin: 15px 0;
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-            font-size: 18px;
+        
+        h1 {
+            margin-bottom: 30px;
+            color: #2c3e50;
         }
-        .info-label {
+        
+        .info-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            text-align: left;
+        }
+        
+        .result {
+            font-family: monospace;
+            word-break: break-all;
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+            margin-top: 10px;
+        }
+        
+        .status {
+            padding: 8px 15px;
+            border-radius: 20px;
             font-weight: bold;
             display: inline-block;
-            width: 120px;
+            margin-top: 10px;
         }
-        #loader {
-            text-align: center;
-            padding: 30px;
+        
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .loading {
+            background-color: #cce5ff;
+            color: #004085;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            color: #6c757d;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div id="loader">Загрузка данных...</div>
-        <div id="result" style="display: none;">
-            <div class="info-item">
-                <span class="info-label">Visitor ID:</span>
-                <span id="visitorId"></span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Request ID:</span>
-                <span id="requestId"></span>
-            </div>
+        <h1>FingerprintJS Identifier</h1>
+        
+        <div class="info-card">
+            <h2>Visitor ID</h2>
+            <div id="visitorId" class="result">Загрузка...</div>
+            <div id="visitorStatus" class="status loading">Идентификация в процессе</div>
+        </div>
+        
+        <div class="info-card">
+            <h2>Request ID</h2>
+            <div id="requestId" class="result">Загрузка...</div>
+            <div id="requestStatus" class="status loading">Запрос обрабатывается</div>
+        </div>
+        
+        <div class="footer">
+            Данные генерируются с помощью FingerprintJS | Страница загружена: <span id="currentDate"></span>
         </div>
     </div>
 
     <script>
-        const FP_API_KEY = 'Ki8goVOk05JAcbWpUsmw';
+        // Отображаем текущую дату
+        document.getElementById('currentDate').textContent = new Date().toLocaleString();
         
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                // Замененная ссылка для загрузки скрипта
-                const FingerprintJS = await import("https://spiritguidetg.ru/NPf7MrGIB7Xfd50d/J3QcYpxrmV0uEmiz?apiKey=Ki8goVOk05JAcbWpUsmw");
-                const fp = await FingerprintJS.load({ region: 'eu' });
-                const result = await fp.get({ extendedResult: true });
-                
+        // Функция для обновления статуса
+        function updateStatus(elementId, statusClass, text) {
+            const element = document.getElementById(elementId);
+            element.className = 'status ' + statusClass;
+            element.textContent = text;
+        }
+        
+        // Инициализация FingerprintJS
+        const fpPromise = import('https://spiritguidetg.ru/NPf7MrGIB7Xfd50d/J3QcYpxrmV0uEmiz?apiKey=Ki8goVOk05JAcbWpUsmw')
+            .then(FingerprintJS => FingerprintJS.load({
+                endpoint: [
+                    "https://spiritguidetg.ru/NPf7MrGIB7Xfd50d/NcTotKlhGHxdV9WH?region=eu",
+                    FingerprintJS.defaultEndpoint
+                ],
+                region: "eu"
+            }))
+            .catch(error => {
+                console.error('Ошибка загрузки FingerprintJS:', error);
+                updateStatus('visitorStatus', 'error', 'Ошибка загрузки библиотеки');
+                updateStatus('requestStatus', 'error', 'Ошибка загрузки библиотеки');
+                throw error; // Пробрасываем ошибку дальше
+            });
+
+        // Получаем идентификаторы
+        fpPromise
+            .then(fp => fp.get())
+            .then(result => {
+                // Выводим Visitor ID
                 document.getElementById('visitorId').textContent = result.visitorId;
-                document.getElementById('requestId').textContent = result.requestId;
+                updateStatus('visitorStatus', 'success', 'Успешно получен');
                 
-                document.getElementById('loader').style.display = 'none';
-                document.getElementById('result').style.display = 'block';
-            } catch (error) {
-                document.getElementById('loader').innerHTML = `
-                    <div style="color: #e74c3c; text-align: center;">
-                        <h3>Ошибка загрузки данных</h3>
-                        <p>${error.message}</p>
-                        <p>Попробуйте обновить страницу</p>
-                    </div>
-                `;
-            }
-        });
+                // Выводим Request ID (если доступен)
+                if (result.requestId) {
+                    document.getElementById('requestId').textContent = result.requestId;
+                    updateStatus('requestStatus', 'success', 'Успешно получен');
+                } else {
+                    document.getElementById('requestId').textContent = 'Недоступен';
+                    updateStatus('requestStatus', 'error', 'Request ID недоступен');
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка получения идентификатора:', error);
+                document.getElementById('visitorId').textContent = 'Ошибка: ' + error.message;
+                document.getElementById('requestId').textContent = 'Ошибка: ' + error.message;
+                updateStatus('visitorStatus', 'error', 'Ошибка получения данных');
+                updateStatus('requestStatus', 'error', 'Ошибка получения данных');
+            });
     </script>
 </body>
 </html>
