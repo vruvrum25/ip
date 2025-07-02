@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Быстрая и точная проверка OS Mismatch / Proxy</title>
+    <title>Расширенная проверка IP, WebRTC и OS Mismatch</title>
     <style>
         body { background: #181818; color: #38f1; font-family: monospace; padding: 30px; }
         .main { max-width: 700px; margin: 0 auto; }
@@ -12,60 +12,12 @@
 </head>
 <body>
 <div class="main">
-    <h2>Проверка Proxy/WebRTC и OS Mismatch (ускоренная)</h2>
+    <h2>Расширенная проверка IP, UDP/WebRTC и OS Mismatch</h2>
     <div id="results" class="result">Проверка...</div>
 </div>
 
 <script>
-// 1. Получить основные признаки User-Agent
-function getDeviceOs() {
-    const userAgent = navigator.userAgent;
-    if (/Windows/i.test(userAgent)) return "Windows";
-    if (/Mac OS X/i.test(userAgent)) return "macOS";
-    if (/Android/i.test(userAgent)) return "Android";
-    if (/iPhone|iPad/i.test(userAgent)) return "iOS";
-    if (/Linux/i.test(userAgent)) return "Linux";
-    return "Unknown";
-}
-function isMobile() {
-    return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
-}
-
-// 2. Fingerprint устройства (минимум)
-function getOSFingerprint() {
-    const touch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    const platform = navigator.platform || 'unknown';
-    const deviceMem = navigator.deviceMemory || '?';
-    const logicalCores = navigator.hardwareConcurrency || '?';
-    const screenW = screen.width;
-    const screenH = screen.height;
-    const hasDevMotion = typeof DeviceMotionEvent !== "undefined";
-    const hasTouchEvent = typeof TouchEvent !== "undefined";
-    return { touch, platform, deviceMem, logicalCores, screenW, screenH, hasDevMotion, hasTouchEvent };
-}
-
-// 3. Логика расширенного osMismatch
-function deepOsMismatch(userOs, osFp) {
-    if (['Android','iOS'].includes(userOs)) {
-        if (!osFp.touch) return true;
-        if (osFp.screenW > 1200 || osFp.screenH > 1200) return true;
-        if (osFp.platform.match(/Win|Mac|Linux/)) return true;
-        if (!osFp.hasDevMotion || !osFp.hasTouchEvent) return true;
-        if (osFp.logicalCores && osFp.logicalCores > 8) return true;
-        if (osFp.deviceMem && osFp.deviceMem > 8) return true;
-    }
-    if (userOs === "Windows") {
-        if (osFp.touch && osFp.screenW < 1000) return true;
-        if (!osFp.platform.match(/Win/)) return true;
-    }
-    if (userOs === "macOS") {
-        if (osFp.touch) return true;
-        if (!osFp.platform.match(/Mac/)) return true;
-    }
-    return false;
-}
-
-// 4. Дополнительные проверки (для ПК)
+// 1. Получить публичный IP
 async function getPublicIP() {
     try {
         let res = await fetch("https://api.ipify.org?format=json");
@@ -75,6 +27,8 @@ async function getPublicIP() {
         return null;
     }
 }
+
+// 2. Получить IP через WebRTC (UDP ICE)
 function getWebRTCIps(timeoutMs=3000) {
     return new Promise((resolve) => {
         let ips = new Set();
@@ -84,7 +38,8 @@ function getWebRTCIps(timeoutMs=3000) {
         pc.onicecandidate = (evt) => {
             if (!evt.candidate) return;
             let candidate = evt.candidate.candidate;
-            let found = candidate.match(/(\d+\.\d+\.\d+\.\d+)/g);
+            let regex = /((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/g;
+            let found = candidate.match(regex);
             if (found) found.forEach(ip => ips.add(ip));
         };
         pc.onicegatheringstatechange = () => {
@@ -104,6 +59,22 @@ function getWebRTCIps(timeoutMs=3000) {
         pc.createOffer().then(offer => pc.setLocalDescription(offer));
     });
 }
+
+// 3. Получить основные признаки User-Agent
+function getDeviceOs() {
+    const userAgent = navigator.userAgent;
+    if (/Windows/i.test(userAgent)) return "Windows";
+    if (/Mac OS X/i.test(userAgent)) return "macOS";
+    if (/Android/i.test(userAgent)) return "Android";
+    if (/iPhone|iPad/i.test(userAgent)) return "iOS";
+    if (/Linux/i.test(userAgent)) return "Linux";
+    return "Unknown";
+}
+function isMobile() {
+    return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+}
+
+// 4. Получить инфу об IP (ASN, ISP, тип подключения)
 async function getIpInfo(ip) {
     try {
         const res = await fetch(`https://ip-api.io/json/${ip}`);
@@ -113,6 +84,76 @@ async function getIpInfo(ip) {
         return null;
     }
 }
+
+// 5. Собрать fingerprint устройства (аппаратный и браузерный)
+function getOSFingerprint() {
+    // Тач
+    const touch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    // Платформа
+    const platform = navigator.platform || 'unknown';
+    // User-Agent и User-Agent Data (если есть)
+    const ua = navigator.userAgent;
+    let uaBrands = "";
+    if (navigator.userAgentData && navigator.userAgentData.brands) {
+        uaBrands = navigator.userAgentData.brands.map(b=>b.brand + "/" + b.version).join(", ");
+    }
+    // Аппаратные характеристики
+    const deviceMem = navigator.deviceMemory || '?';
+    const logicalCores = navigator.hardwareConcurrency || '?';
+    const screenW = screen.width;
+    const screenH = screen.height;
+    const colorDepth = screen.colorDepth;
+    // Проверка API
+    const hasDevMotion = typeof DeviceMotionEvent !== "undefined";
+    const hasTouchEvent = typeof TouchEvent !== "undefined";
+    // Канвас fingerprint (хэш)
+    let canvasHash = "";
+    try {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        ctx.textBaseline = "top";
+        ctx.font = "16px Arial";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillStyle = "#f60";
+        ctx.fillRect(0, 0, 100, 20);
+        ctx.fillStyle = "#069";
+        ctx.fillText("Hello, fingerprint!", 2, 15);
+        canvasHash = canvas.toDataURL();
+    } catch (e) {
+        canvasHash = "error";
+    }
+
+    return {
+        touch, platform, ua, uaBrands, deviceMem, logicalCores,
+        screenW, screenH, colorDepth, hasDevMotion, hasTouchEvent, canvasHash
+    };
+}
+
+// 6. Логика расширенного osMismatch
+function deepOsMismatch(userOs, osFp) {
+    // Для Android/iOS: тач должен быть, экран маленький, платформа не должна быть Win/Mac/Linux
+    if (['Android','iOS'].includes(userOs)) {
+        if (!osFp.touch) return true;
+        if (osFp.screenW > 1200 || osFp.screenH > 1200) return true;
+        if (osFp.platform.match(/Win|Mac|Linux/)) return true;
+        if (!osFp.hasDevMotion || !osFp.hasTouchEvent) return true;
+        // На мобильном обычно 1-8 CPU, deviceMemory <= 8
+        if (osFp.logicalCores && osFp.logicalCores > 8) return true;
+        if (osFp.deviceMem && osFp.deviceMem > 8) return true;
+    }
+    // Для Windows/macOS: не должно быть тача, платформа Win/Mac, экран обычно > 1000
+    if (userOs === "Windows") {
+        if (osFp.touch && osFp.screenW < 1000) return true; // на обычном Windows нет тача и маленьких экранов
+        if (!osFp.platform.match(/Win/)) return true;
+    }
+    if (userOs === "macOS") {
+        if (osFp.touch) return true;
+        if (!osFp.platform.match(/Mac/)) return true;
+    }
+    return false;
+}
+
+// 7. Проверка IP/ASN-OS несоответствия
 function isIpOsMismatch(ipInfo, userOs) {
     if (!ipInfo || !userOs) return false;
     let org = (ipInfo.organization || '').toLowerCase();
@@ -124,71 +165,56 @@ function isIpOsMismatch(ipInfo, userOs) {
     return false;
 }
 
-// 5. Основная функция
-(async function runCheck(){
+// 8. Основная функция
+async function runCheck() {
     let results = document.getElementById("results");
     results.textContent = "Проверяем...";
 
-    let userOs = getDeviceOs();
-    let mobile = isMobile();
-    let osFp = getOSFingerprint();
-    let osMismatch = deepOsMismatch(userOs, osFp);
-
-    if(mobile){
-        // Только быстрый fingerprint-анализ, никаких сетевых задержек!
-        let html = `
-            <b>User-Agent OS:</b> <span>${userOs}</span><br>
-            <b>Тип устройства:</b> <span>Мобильный</span><br>
-            <b><span style="color:#fff">osMismatch:</span> <span style="color:${osMismatch ? 'orange' : 'lime'};font-weight:bold">${osMismatch}</span></b><br>
-            <br>
-        `;
-        if(osMismatch){
-            html += `<b style="color:orange;">⚠️ Есть признаки эмуляции или подмены мобильного устройства ("osMismatch": true)</b><br>`;
-        }else{
-            html += `<b style="color:lime;">Всё выглядит как настоящий мобильный.</b>`;
-        }
-        html += `<div class="json"><pre>${JSON.stringify({
-            userOS: userOs,
-            osMismatch,
-            fp: osFp
-        }, null, 2)}</pre></div>`;
-        results.innerHTML = html;
-        return;
-    }
-
-    // Для ПК - стандартная полная проверка (IP, WebRTC, ASN, osMismatch)
     let publicIP = await getPublicIP();
     let webrtcIps = await getWebRTCIps();
+    let userOs = getDeviceOs();
+    let mobile = isMobile();
     let ipInfo = publicIP ? await getIpInfo(publicIP) : null;
-    osMismatch = isIpOsMismatch(ipInfo, userOs) || deepOsMismatch(userOs, osFp);
+    let osFp = getOSFingerprint();
+    let osMismatch =
+        isIpOsMismatch(ipInfo, userOs) ||
+        deepOsMismatch(userOs, osFp);
 
     let html = `
-        <b>Ваш публичный IP (HTTP):</b> <span>${publicIP || 'Ошибка'}</span><br>
-        <b>Ваши IP через WebRTC (UDP):</b> <span>${webrtcIps.length ? webrtcIps.join(', ') : 'Не удалось получить (UDP/WebRTC заблокирован)'}</span><br>
+        <b>Ваш публичный IP (HTTP):</b> <br> <span>${publicIP || 'Ошибка'}</span><br>
+        <b>Ваши IP через WebRTC (UDP):</b> <br> <span>${webrtcIps.length ? webrtcIps.join(', ') : 'Не удалось получить (UDP/WebRTC заблокирован)'}</span><br>
         <b>User-Agent OS:</b> <span>${userOs}</span><br>
-        <b>Тип устройства:</b> <span>Десктоп</span><br>
+        <b>Тип устройства:</b> <span>${mobile ? "Мобильный" : "Десктоп"}</span><br>
         <b>IP ASN/ISP:</b> <span>${ipInfo ? ipInfo.organization : 'Неизвестно'}</span><br>
         <b>Тип подключения (по данным IP):</b> <span>${ipInfo ? ipInfo.connection_type : 'Неизвестно'}</span><br>
-        <b><span style="color:#fff">osMismatch:</span> <span style="color:${osMismatch ? 'orange' : 'lime'};font-weight:bold">${osMismatch}</span></b><br>
+        <b><span style="color:#fff">osMismatch:</span> <span style="color:${osMismatch ? 'orange' : 'lime'};font-weight:bold">${osMismatch ? 'true' : 'false'}</span></b><br>
         <br>
     `;
+
+    // osMismatch объяснение
     if (osMismatch) {
         html += `<b style="color:orange;">Обнаружено расширенное несоответствие между вашей ОС и поведением устройства ("osMismatch": true)</b>
-        <br>Это признак использования прокси, антидетект-браузера, эмулятора или подмены устройства.<br><br>`;
+        <br>Это сильный признак использования прокси, антидетект-браузера, эмулятора или подмены мобильного устройства.<br><br>`;
     }
 
+    // UDP/WebRTC блок/совпадение/разница
     if (!webrtcIps.length) {
         html += `<b style="color:orange;">UDP или WebRTC-запросы заблокированы!</b>
-        <br>Это может быть прокси, антидетект-браузер или блокировка UDP/WebRTC.`;
+        <br>Это может быть прокси, антидетект-браузер или специально заблокированный UDP/WebRTC.`;
     } else if (webrtcIps.includes(publicIP)) {
         html += `<b style="color:lime;">IP через UDP/WebRTC совпадает с HTTP — всё нормально!</b>
         <br>Обычный интернет, без скрытых прокси и антидетектов.`;
     } else {
-        html += `<b style="color:red;">Обнаружено несоответствие IP!</b>
-        <br>Это может быть признаком использования прокси/VPN/антидетекта.<br>
-        <small>Если вы не используете мобильный интернет и ваш браузер обычный, возможно, применяется прокси/антидетект или браузер с подменой WebRTC.</small>`;
+        if (mobile) {
+            html += `<b style="color:gold;">На мобильных соединениях (3G/4G/5G) часто разные IP — это нормально!</b>`;
+        } else {
+            html += `<b style="color:red;">Обнаружено несоответствие IP!</b>
+            <br>Это может быть признаком использования прокси/VPN/антидетекта.<br>
+            <small>Если вы не используете мобильный интернет и ваш браузер обычный, возможно, применяется прокси/антидетект/браузер с подменой WebRTC.</small>`;
+        }
     }
 
+    // JSON-блок для копирования/автоматизации
     html += `<div class="json"><pre>${JSON.stringify({
         publicIP: publicIP || 'Ошибка',
         userOS: userOs,
@@ -200,7 +226,9 @@ function isIpOsMismatch(ipInfo, userOs) {
     }, null, 2)}</pre></div>`;
 
     results.innerHTML = html;
-})();
+}
+
+runCheck();
 </script>
 </body>
 </html>
