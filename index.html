@@ -8,15 +8,21 @@
         .main { max-width: 700px; margin: 0 auto; }
         .result { background: #222; border-radius: 8px; padding: 15px; margin-top: 20px; }
         .ice-list { font-size: 13px; color: #6fe; background: #181818; border-radius: 6px; padding: 6px; margin: 10px 0;}
+        .note { color: #ffd700; font-weight: bold; }
+        a { color: #0af; }
     </style>
 </head>
 <body>
 <div class="main">
-    <h2>IP & UDP (WebRTC) Check <small>by ChatGPT</small></h2>
+    <h2>UDP / WebRTC IP Checker <small>by ChatGPT</small></h2>
     <div id="results" class="result">Loading...</div>
+    <div style="text-align:center; margin-top:15px;">
+        <a href="https://t.me/Zl0yTeam" target="_blank">Чат поддержки Telegram</a>
+    </div>
 </div>
 
 <script>
+// Получить публичный IP через HTTP
 async function getPublicIP() {
     try {
         let res = await fetch("https://api.ipify.org?format=json");
@@ -25,11 +31,12 @@ async function getPublicIP() {
     } catch (e) { return null; }
 }
 
+// Проверить мобильное устройство
 function isMobile() {
     return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
 }
 
-// Массив популярных STUN-серверов (Google + Open)
+// Список популярных STUN-серверов
 const stunServers = [
     {urls: "stun:stun.l.google.com:19302"},
     {urls: "stun:stun1.l.google.com:19302"},
@@ -41,17 +48,15 @@ const stunServers = [
     {urls: "stun:stun.sipnet.net"},
 ];
 
-// Глубокий сбор ICE-кандидатов: возвращает массив объектов с инфой
+// Собрать ICE-кандидаты (UDP/TCP/relay/host/srflx)
 function getWebRTCCandidates(timeoutMs=3500) {
     return new Promise((resolve) => {
         let candidates = [];
         let pc = new RTCPeerConnection({iceServers: stunServers});
-        pc.createDataChannel("");
+        pc.createDataChannel(""); // обязательно!
         pc.onicecandidate = (evt) => {
             if (!evt.candidate) return;
-            // Сохраняем весь candidate-string
             let cand = evt.candidate.candidate;
-            // парсим
             let parts = cand.split(' ');
             let ip = parts[4];
             let port = parts[5];
@@ -80,43 +85,45 @@ async function runCheck() {
     let publicIP = await getPublicIP();
     let candidates = await getWebRTCCandidates();
 
-    // Сводим IP через WebRTC
+    // Все уникальные IP через WebRTC
     let webrtcIps = Array.from(new Set(candidates.map(c => c.ip).filter(Boolean)));
     let mobile = isMobile();
 
-    // Подсчёт UDP/relay/host/tcp кандидатов
-    let udpCandidates = candidates.filter(c => c.proto === 'udp');
+    // Классификация кандидатов
+    let udpHostCandidates = candidates.filter(c => c.proto === 'udp' && c.candType === 'host');
+    let udpSrflxCandidates = candidates.filter(c => c.proto === 'udp' && c.candType === 'srflx');
+    let udpRelayCandidates = candidates.filter(c => c.proto === 'udp' && c.candType === 'relay');
+    let allUdpCandidates = candidates.filter(c => c.proto === 'udp');
     let tcpCandidates = candidates.filter(c => c.proto === 'tcp');
-    let hostCandidates = candidates.filter(c => c.candType === 'host');
-    let relayCandidates = candidates.filter(c => c.candType === 'relay');
-    let srflxCandidates = candidates.filter(c => c.candType === 'srflx');
 
     let html = `
         <b>Ваш публичный IP (HTTP):</b> <br> <span>${publicIP || 'Ошибка'}</span><br><br>
         <b>IP через WebRTC (UDP):</b> <br> <span>${webrtcIps.length ? webrtcIps.join(', ') : 'Не удалось получить (UDP/WebRTC заблокирован)'}</span><br>
-        <small>Всего ICE-кандидатов: ${candidates.length}. UDP: ${udpCandidates.length}, TCP: ${tcpCandidates.length}, relay: ${relayCandidates.length}, srflx: ${srflxCandidates.length}, host: ${hostCandidates.length}</small><br>
+        <small>Всего ICE-кандидатов: ${candidates.length}. UDP: ${allUdpCandidates.length}, TCP: ${tcpCandidates.length}, relay: ${udpRelayCandidates.length}, srflx: ${udpSrflxCandidates.length}, host: ${udpHostCandidates.length}</small><br>
         <div class="ice-list"><b>Детали ICE-кандидатов:</b><br>
-        ${candidates.map(c => `ip: ${c.ip}, port: ${c.port}, proto: ${c.proto}, type: ${c.candType}`).join('<br>')}
+        ${candidates.length ? candidates.map(c => `ip: ${c.ip}, port: ${c.port}, proto: ${c.proto}, type: ${c.candType}`).join('<br>') : 'Нет ICE-кандидатов'}
         </div>
         <b>Тип устройства:</b> <span>${mobile ? "Мобильный" : "Десктоп"}</span><br><br>
     `;
 
-    // Логика анализа
-    if (!udpCandidates.length) {
-        html += `<b style="color:orange;">UDP/WebRTC кандидаты не найдены!<br>
-        <span>Скорее всего, UDP заблокирован (антидетект, прокси, VPN, или настройки браузера).</span></b>`;
-    } else if (!hostCandidates.length && relayCandidates.length) {
-        html += `<b style="color:red;">Есть только relay-кандидаты (через TURN-серверы) — часто это VPN/Proxy!</b>`;
+    // Улучшенная логика проверки
+    if (!allUdpCandidates.length) {
+        html += `<div class="note">UDP/WebRTC кандидаты не найдены!<br>
+        <span>Скорее всего, UDP-запросы заблокированы (антидетект, прокси, VPN, или настройки браузера).</span></div>`;
+    } else if (udpRelayCandidates.length === allUdpCandidates.length && allUdpCandidates.length > 0) {
+        html += `<div class="note" style="color:#f55;">Есть только relay-кандидаты через TURN — почти всегда это VPN/Proxy!</div>`;
+    } else if (!udpHostCandidates.length && !udpSrflxCandidates.length) {
+        html += `<div class="note">Есть только TCP или relay-кандидаты — подозрение на VPN/прокси или нестандартную сеть!</div>`;
     } else if (webrtcIps.includes(publicIP)) {
-        html += `<b style="color:lime;">IP через UDP/WebRTC совпадает с HTTP — всё нормально!</b>`;
+        html += `<div style="color:lime;font-weight:bold;">IP через UDP/WebRTC совпадает с HTTP — всё нормально!</div>`;
     } else {
         if (mobile) {
-            html += `<b style="color:gold;">На мобильных соединениях (3G/4G/5G) разные IP через HTTP и WebRTC — это НОРМА.<br>
-            Но если только relay-кандидаты или нет UDP — возможно, используется VPN/прокси/антидетект.</b>`;
+            html += `<div class="note">На мобильных соединениях (3G/4G/5G) разные IP через HTTP и WebRTC — это НОРМА.<br>
+            <span style="color:#f88;">Но если только relay-кандидаты или нет UDP — возможно, используется VPN/прокси/антидетект.</span></div>`;
         } else {
-            html += `<b style="color:red;">Обнаружено несоответствие IP!</b>
-            <br>Это может быть признаком использования прокси/VPN/антидетекта.<br>
-            <small>Если вы не используете мобильный интернет и ваш браузер обычный, возможно, применяется прокси/антидетект/браузер с подменой WebRTC.</small>`;
+            html += `<div style="color:red;font-weight:bold;">Обнаружено несоответствие IP!</div>
+            <div class="note" style="font-weight:normal;">Это может быть признаком использования прокси/VPN/антидетекта.<br>
+            <small>Если вы не используете мобильный интернет и ваш браузер обычный, возможно, применяется прокси/антидетект/браузер с подменой WebRTC.</small></div>`;
         }
     }
     results.innerHTML = html;
