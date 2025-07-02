@@ -2,17 +2,17 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Проверка IP, UDP (WebRTC) и OS Mismatch</title>
+    <title>Расширенная проверка IP, WebRTC и OS Mismatch</title>
     <style>
         body { background: #181818; color: #38f1; font-family: monospace; padding: 30px; }
-        .main { max-width: 600px; margin: 0 auto; }
+        .main { max-width: 700px; margin: 0 auto; }
         .result { background: #222; border-radius: 8px; padding: 15px; margin-top: 20px; }
         .json { background: #111; color: #0fa; padding: 10px; border-radius: 6px; font-size: 15px; margin-top: 8px; }
     </style>
 </head>
 <body>
 <div class="main">
-    <h2>Проверка IP, UDP (WebRTC) и OS Mismatch</h2>
+    <h2>Расширенная проверка IP, UDP/WebRTC и OS Mismatch</h2>
     <div id="results" class="result">Проверка...</div>
 </div>
 
@@ -35,7 +35,6 @@ function getWebRTCIps(timeoutMs=3000) {
         let done = false;
         let pc = new RTCPeerConnection({iceServers: [{urls: "stun:stun.l.google.com:19302"}]});
         pc.createDataChannel("");
-
         pc.onicecandidate = (evt) => {
             if (!evt.candidate) return;
             let candidate = evt.candidate.candidate;
@@ -43,7 +42,6 @@ function getWebRTCIps(timeoutMs=3000) {
             let found = candidate.match(regex);
             if (found) found.forEach(ip => ips.add(ip));
         };
-
         pc.onicegatheringstatechange = () => {
             if (pc.iceGatheringState === "complete" && !done) {
                 done = true;
@@ -51,7 +49,6 @@ function getWebRTCIps(timeoutMs=3000) {
                 resolve(Array.from(ips));
             }
         };
-
         setTimeout(() => {
             if (!done) {
                 done = true;
@@ -59,12 +56,11 @@ function getWebRTCIps(timeoutMs=3000) {
                 resolve(Array.from(ips));
             }
         }, timeoutMs);
-
         pc.createOffer().then(offer => pc.setLocalDescription(offer));
     });
 }
 
-// 3. Определить тип устройства и ОС
+// 3. Получить основные признаки User-Agent
 function getDeviceOs() {
     const userAgent = navigator.userAgent;
     if (/Windows/i.test(userAgent)) return "Windows";
@@ -81,7 +77,6 @@ function isMobile() {
 // 4. Получить инфу об IP (ASN, ISP, тип подключения)
 async function getIpInfo(ip) {
     try {
-        // Можно использовать любой сервис, здесь ip-api.io (работает без API-ключа)
         const res = await fetch(`https://ip-api.io/json/${ip}`);
         const data = await res.json();
         return data;
@@ -90,22 +85,87 @@ async function getIpInfo(ip) {
     }
 }
 
-// 5. Проверить osMismatch
-function isOsMismatch(ipInfo, userOs) {
+// 5. Собрать fingerprint устройства (аппаратный и браузерный)
+function getOSFingerprint() {
+    // Тач
+    const touch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    // Платформа
+    const platform = navigator.platform || 'unknown';
+    // User-Agent и User-Agent Data (если есть)
+    const ua = navigator.userAgent;
+    let uaBrands = "";
+    if (navigator.userAgentData && navigator.userAgentData.brands) {
+        uaBrands = navigator.userAgentData.brands.map(b=>b.brand + "/" + b.version).join(", ");
+    }
+    // Аппаратные характеристики
+    const deviceMem = navigator.deviceMemory || '?';
+    const logicalCores = navigator.hardwareConcurrency || '?';
+    const screenW = screen.width;
+    const screenH = screen.height;
+    const colorDepth = screen.colorDepth;
+    // Проверка API
+    const hasDevMotion = typeof DeviceMotionEvent !== "undefined";
+    const hasTouchEvent = typeof TouchEvent !== "undefined";
+    // Канвас fingerprint (хэш)
+    let canvasHash = "";
+    try {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        ctx.textBaseline = "top";
+        ctx.font = "16px Arial";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillStyle = "#f60";
+        ctx.fillRect(0, 0, 100, 20);
+        ctx.fillStyle = "#069";
+        ctx.fillText("Hello, fingerprint!", 2, 15);
+        canvasHash = canvas.toDataURL();
+    } catch (e) {
+        canvasHash = "error";
+    }
+
+    return {
+        touch, platform, ua, uaBrands, deviceMem, logicalCores,
+        screenW, screenH, colorDepth, hasDevMotion, hasTouchEvent, canvasHash
+    };
+}
+
+// 6. Логика расширенного osMismatch
+function deepOsMismatch(userOs, osFp) {
+    // Для Android/iOS: тач должен быть, экран маленький, платформа не должна быть Win/Mac/Linux
+    if (['Android','iOS'].includes(userOs)) {
+        if (!osFp.touch) return true;
+        if (osFp.screenW > 1200 || osFp.screenH > 1200) return true;
+        if (osFp.platform.match(/Win|Mac|Linux/)) return true;
+        if (!osFp.hasDevMotion || !osFp.hasTouchEvent) return true;
+        // На мобильном обычно 1-8 CPU, deviceMemory <= 8
+        if (osFp.logicalCores && osFp.logicalCores > 8) return true;
+        if (osFp.deviceMem && osFp.deviceMem > 8) return true;
+    }
+    // Для Windows/macOS: не должно быть тача, платформа Win/Mac, экран обычно > 1000
+    if (userOs === "Windows") {
+        if (osFp.touch && osFp.screenW < 1000) return true; // на обычном Windows нет тача и маленьких экранов
+        if (!osFp.platform.match(/Win/)) return true;
+    }
+    if (userOs === "macOS") {
+        if (osFp.touch) return true;
+        if (!osFp.platform.match(/Mac/)) return true;
+    }
+    return false;
+}
+
+// 7. Проверка IP/ASN-OS несоответствия
+function isIpOsMismatch(ipInfo, userOs) {
     if (!ipInfo || !userOs) return false;
     let org = (ipInfo.organization || '').toLowerCase();
     let connType = (ipInfo.connection_type || '').toLowerCase();
     let isMobileOrg = org.includes('mobile') || org.includes('cellular') || connType === 'mobile';
     let isHosting = org.includes('host') || org.includes('server') || org.includes('vps') || org.includes('cloud');
-
-    // Android/iOS + датацентр = mismatch
     if (['Android', 'iOS'].includes(userOs) && isHosting) return true;
-    // Windows/macOS/Linux + мобильный оператор = mismatch
     if (['Windows', 'macOS', 'Linux'].includes(userOs) && isMobileOrg) return true;
     return false;
 }
 
-// 6. Основная функция
+// 8. Основная функция
 async function runCheck() {
     let results = document.getElementById("results");
     results.textContent = "Проверяем...";
@@ -115,7 +175,10 @@ async function runCheck() {
     let userOs = getDeviceOs();
     let mobile = isMobile();
     let ipInfo = publicIP ? await getIpInfo(publicIP) : null;
-    let osMismatch = isOsMismatch(ipInfo, userOs);
+    let osFp = getOSFingerprint();
+    let osMismatch =
+        isIpOsMismatch(ipInfo, userOs) ||
+        deepOsMismatch(userOs, osFp);
 
     let html = `
         <b>Ваш публичный IP (HTTP):</b> <br> <span>${publicIP || 'Ошибка'}</span><br>
@@ -130,8 +193,8 @@ async function runCheck() {
 
     // osMismatch объяснение
     if (osMismatch) {
-        html += `<b style="color:orange;">Обнаружено несоответствие между вашей ОС и IP ("osMismatch": true)</b>
-        <br>Это частый признак использования прокси, антидетект-браузера или эмулятора!<br><br>`;
+        html += `<b style="color:orange;">Обнаружено расширенное несоответствие между вашей ОС и поведением устройства ("osMismatch": true)</b>
+        <br>Это сильный признак использования прокси, антидетект-браузера, эмулятора или подмены мобильного устройства.<br><br>`;
     }
 
     // UDP/WebRTC блок/совпадение/разница
@@ -152,14 +215,15 @@ async function runCheck() {
     }
 
     // JSON-блок для копирования/автоматизации
-    html += `<div class="json"><pre>{
-  "publicIP": "${publicIP || 'Ошибка'}",
-  "userOS": "${userOs}",
-  "osMismatch": ${osMismatch},
-  "webrtcIps": ${JSON.stringify(webrtcIps)},
-  "isp": "${ipInfo ? ipInfo.organization : 'Неизвестно'}",
-  "connectionType": "${ipInfo ? ipInfo.connection_type : 'Неизвестно'}"
-}</pre></div>`;
+    html += `<div class="json"><pre>${JSON.stringify({
+        publicIP: publicIP || 'Ошибка',
+        userOS: userOs,
+        osMismatch,
+        webrtcIps,
+        isp: ipInfo ? ipInfo.organization : 'Неизвестно',
+        connectionType: ipInfo ? ipInfo.connection_type : 'Неизвестно',
+        fp: osFp
+    }, null, 2)}</pre></div>`;
 
     results.innerHTML = html;
 }
