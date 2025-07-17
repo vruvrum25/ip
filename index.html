@@ -2,100 +2,93 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>UDP / WebRTC IP Checker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UDP Test</title>
     <style>
-        body { background: #181818; color: #38f1; font-family: monospace; padding: 30px; }
-        .main { max-width: 600px; margin: 0 auto; }
-        .result { background: #222; border-radius: 8px; padding: 15px; margin-top: 20px; }
+        body {
+            font-family: Arial, sans-serif;
+            background: white;
+            margin: 50px;
+            text-align: center;
+        }
+        .result {
+            font-size: 24px;
+            margin: 20px 0;
+        }
+        .time {
+            font-size: 18px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
-<div class="main">
-    <h2>IP & UDP (WebRTC) Check</h2>
-    <div id="results" class="result">Loading...</div>
-</div>
+    <div id="result" class="result">Проверка UDP...</div>
+    <div id="time" class="time"></div>
 
-<script>
-// 1. Определить мобильное устройство сразу (чтобы мгновенно завершить)
-function isMobile() {
-    return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
-}
-
-// 2. Проверка UDP/WebRTC для десктопа
-async function getPublicIP() {
-    try {
-        let res = await fetch("https://api.ipify.org?format=json");
-        let data = await res.json();
-        return data.ip;
-    } catch (e) {
-        return null;
-    }
-}
-function getWebRTCIps(timeoutMs=3000) {
-    return new Promise((resolve) => {
-        let ips = new Set();
-        let done = false;
-        let pc = new RTCPeerConnection({iceServers: [{urls: "stun:stun.l.google.com:19302"}]});
-        pc.createDataChannel("");
-        pc.onicecandidate = (evt) => {
-            if (!evt.candidate) return;
-            let candidate = evt.candidate.candidate;
-            let regex = /((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/g;
-            let found = candidate.match(regex);
-            if (found) found.forEach(ip => ips.add(ip));
-        };
-        pc.onicegatheringstatechange = () => {
-            if (pc.iceGatheringState === "complete" && !done) {
-                done = true;
-                pc.close();
-                resolve(Array.from(ips));
+    <script type="module">
+        (async () => {
+            const startTime = performance.now();
+            
+            try {
+                // Быстрая проверка UDP блокировки
+                const isUDPBlocked = await new Promise((resolve) => {
+                    const timeout = setTimeout(() => resolve(true), 2000); // 2 сек таймаут
+                    let resolved = false; // Флаг для предотвращения двойного resolve
+                    
+                    try {
+                        const pc = new RTCPeerConnection({
+                            iceServers: [
+                                { urls: 'stun:stun.sipnet.ru:3478' },      // Российский первым
+                                { urls: 'stun:stun.l.google.com:19302' }   // Google вторым
+                            ]
+                        });
+                        
+                        pc.onicecandidate = (e) => {
+                            if (!resolved && e.candidate && e.candidate.candidate.includes('udp')) {
+                                resolved = true;
+                                clearTimeout(timeout);
+                                resolve(false); // UDP работает - первый же ответ
+                            }
+                        };
+                        
+                        pc.onicegatheringstatechange = () => {
+                            if (!resolved && pc.iceGatheringState === 'complete') {
+                                resolved = true;
+                                clearTimeout(timeout);
+                                resolve(true); // UDP заблокирован
+                            }
+                        };
+                        
+                        pc.createDataChannel('');
+                        pc.createOffer().then(o => pc.setLocalDescription(o)).catch(() => {
+                            if (!resolved) {
+                                resolved = true;
+                                clearTimeout(timeout);
+                                resolve(true);
+                            }
+                        });
+                    } catch {
+                        if (!resolved) {
+                            resolved = true;
+                            clearTimeout(timeout);
+                            resolve(true);
+                        }
+                    }
+                });
+                
+                const endTime = performance.now();
+                const totalTime = endTime - startTime;
+                const seconds = (totalTime / 1000).toFixed(3);
+                
+                // Отображение результата
+                document.getElementById('result').textContent = isUDPBlocked ? 'UDP заблокирован' : 'UDP работает';
+                document.getElementById('time').textContent = `Время: ${Math.round(totalTime)}ms (${seconds}s)`;
+                
+            } catch (err) {
+                document.getElementById('result').textContent = 'Ошибка проверки';
+                document.getElementById('time').textContent = 'Время: -';
             }
-        };
-        setTimeout(() => {
-            if (!done) {
-                done = true;
-                pc.close();
-                resolve(Array.from(ips));
-            }
-        }, timeoutMs);
-        pc.createOffer().then(offer => pc.setLocalDescription(offer));
-    });
-}
-
-// 3. Логика работы: сперва ОС, затем по ситуации
-async function runCheck() {
-    let results = document.getElementById("results");
-    if (isMobile()) {
-        results.innerHTML = `
-            <b>Тип устройства:</b> <span>Мобильный</span><br><br>
-            <b style="color:lime;">Для мобильных устройств проверка UDP не требуется. Всё ок!</b>
-        `;
-        return;
-    }
-    results.textContent = "Проверяем UDP/WebRTC...";
-    let publicIP = await getPublicIP();
-    let webrtcIps = await getWebRTCIps();
-    let html = `
-        <b>Ваш публичный IP (HTTP):</b> <br> <span>${publicIP || 'Ошибка'}</span><br><br>
-        <b>Ваши IP через WebRTC (UDP):</b> <br> <span>${webrtcIps.length ? webrtcIps.join(', ') : 'Не удалось получить (UDP/WebRTC заблокирован или браузер настроен)'}</span><br><br>
-        <b>Тип устройства:</b> <span>Десктоп</span><br><br>
-    `;
-    // Анализ результата
-    if (!webrtcIps.length) {
-        html += `<b style="color:orange;">UDP или WebRTC-запросы заблокированы!</b>
-        <br>Это может быть прокси, антидетект-браузер или специально заблокированный UDP/WebRTC.`;
-    } else if (webrtcIps.includes(publicIP)) {
-        html += `<b style="color:lime;">IP через UDP/WebRTC совпадает с HTTP — всё нормально!</b>
-        <br>Обычный интернет, без скрытых прокси и антидетектов.`;
-    } else {
-        html += `<b style="color:red;">Обнаружено несоответствие IP!</b>
-        <br>Это может быть признаком использования прокси/VPN/антидетекта.<br>
-        <small>Если вы не используете мобильный интернет и ваш браузер обычный, возможно, применяется прокси/антидетект/браузер с подменой WebRTC.</small>`;
-    }
-    results.innerHTML = html;
-}
-
-runCheck();
-</script>
+        })();
+    </script>
 </body>
 </html>
