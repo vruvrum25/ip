@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>UDP Check</title>
+    <title>UDP Check - Детальная диагностика</title>
     <style>
         body { 
             background: white; 
@@ -15,6 +15,14 @@
             font-size: 16px;
             line-height: 1.5;
         }
+        .candidate-info {
+            background: #f5f5f5;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -24,71 +32,100 @@
 async function checkUDP() {
     const startTime = Date.now();
     
-    const servers = [
-        {urls: "stun:stun.l.google.com:19302"},
-        {urls: "stun:stun2.l.google.com:19302"}
-    ];
-    
-    let completed = false;
-    const allIps = new Set();
-    const connections = [];
-    
-    function cleanup() {
-        connections.forEach(pc => {
-            try { pc.close(); } catch(e) {}
+    try {
+        const pc = new RTCPeerConnection({
+            iceServers: [{urls: "stun:stun.l.google.com:19302"}]
         });
+        
+        pc.createDataChannel("");
+        
+        const candidateDetails = [];
+        let completed = false;
+        
+        pc.onicecandidate = (evt) => {
+            if (!evt.candidate) return;
+            
+            const candidate = evt.candidate.candidate;
+            const regex = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g;
+            const found = candidate.match(regex);
+            
+            if (found) {
+                found.forEach(ip => {
+                    // Определяем тип кандидата
+                    let type = "Неизвестный";
+                    if (candidate.includes("typ host")) {
+                        type = "Host (локальный)";
+                    } else if (candidate.includes("typ srflx")) {
+                        type = "Server Reflexive (публичный через STUN)";
+                    } else if (candidate.includes("typ relay")) {
+                        type = "Relay (через TURN сервер)";
+                    }
+                    
+                    candidateDetails.push({
+                        ip: ip,
+                        type: type,
+                        fullCandidate: candidate,
+                        timestamp: Date.now() - startTime
+                    });
+                });
+                
+                // Обновляем результат в реальном времени
+                showResult(candidateDetails, startTime, false, false);
+            }
+        };
+        
+        pc.onicegatheringstatechange = () => {
+            if (pc.iceGatheringState === "complete" && !completed) {
+                completed = true;
+                pc.close();
+                showResult(candidateDetails, startTime, false, true);
+            }
+        };
+        
+        setTimeout(() => {
+            if (!completed) {
+                completed = true;
+                pc.close();
+                showResult(candidateDetails, startTime, false, true);
+            }
+        }, 3000);
+        
+        await pc.createOffer().then(offer => pc.setLocalDescription(offer));
+        
+    } catch (error) {
+        showResult([], startTime, true, true);
+    }
+}
+
+function showResult(candidateDetails, startTime, error = false, isComplete = false) {
+    const duration = Date.now() - startTime;
+    const resultDiv = document.getElementById('result');
+    
+    if (error) {
+        resultDiv.innerHTML = `UDP заблокирован<br>Время: ${duration}ms (${(duration/1000).toFixed(3)}s)<br>Ошибка получения IP через WebRTC`;
+        return;
     }
     
-    function showResult() {
-        if (completed) return;
-        completed = true;
-        cleanup();
-        
-        const duration = Date.now() - startTime;
-        const resultDiv = document.getElementById('result');
-        
-        if (allIps.size === 0) {
-            resultDiv.innerHTML = `UDP заблокирован<br>Время: ${duration}ms (${(duration/1000).toFixed(3)}s)<br>Ваши IP через WebRTC (UDP): не получено`;
-        } else {
-            resultDiv.innerHTML = `UDP работает<br>Время: ${duration}ms (${(duration/1000).toFixed(3)}s)<br>Ваши IP через WebRTC (UDP): ${Array.from(allIps).join(', ')}`;
-        }
-    }
+    const status = candidateDetails.length > 0 ? 'UDP работает' : 'UDP заблокирован';
+    const completeText = isComplete ? ' (завершено)' : ' (получение...)';
     
-    // Пробуем оба сервера одновременно
-    servers.forEach(server => {
-        try {
-            const pc = new RTCPeerConnection({iceServers: [server]});
-            connections.push(pc);
-            
-            pc.createDataChannel("");
-            
-            pc.onicecandidate = (evt) => {
-                if (!evt.candidate || completed) return;
-                const regex = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g;
-                const found = evt.candidate.candidate.match(regex);
-                if (found) {
-                    found.forEach(ip => allIps.add(ip));
-                    showResult(); // Как только получили первый IP - выводим результат
-                }
-            };
-            
-            pc.onicegatheringstatechange = () => {
-                if (pc.iceGatheringState === "complete" && allIps.size > 0) {
-                    showResult();
-                }
-            };
-            
-            pc.createOffer().then(offer => pc.setLocalDescription(offer));
-            
-        } catch (error) {
-            // Игнорируем ошибки отдельных серверов
-        }
+    let detailsHtml = '';
+    candidateDetails.forEach(detail => {
+        detailsHtml += `
+            <div class="candidate-info">
+                <strong>IP:</strong> ${detail.ip}<br>
+                <strong>Тип:</strong> ${detail.type}<br>
+                <strong>Время получения:</strong> ${detail.timestamp}ms<br>
+                <strong>Полный candidate:</strong> ${detail.fullCandidate}
+            </div>
+        `;
     });
     
-    // Таймаут на случай если ни один сервер не ответит
-    setTimeout(() => {
-        showResult();
-    }, 3000);
+    if (candidateDetails.length === 0 && isComplete) {
+        detailsHtml = '<div class="candidate-info">IP адреса не получены</div>';
+    }
+    
+    resultDiv.innerHTML = `${status}${completeText}<br>Общее время: ${duration}ms (${(duration/1000).toFixed(3)}s)<br><br>${detailsHtml}`;
 }
 
 checkUDP();
