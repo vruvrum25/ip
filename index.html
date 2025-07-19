@@ -91,7 +91,7 @@
 </head>
 <body>
     <h1>WebRTC IP Detection Test</h1>
-    <p>Автоматическое сканирование WebRTC IP адресов</p>
+    <p>Автоматическое сканирование WebRTC IPv4 адресов</p>
     
     <div class="container">
         <h3>Статистика сканирования</h3>
@@ -100,17 +100,17 @@
         <div class="progress-bar">
             <div class="progress-fill" id="progressBar"></div>
         </div>
-        <div>Собрано IP кандидатов: <span id="candidateCount" style="font-weight: bold;">0</span></div>
+        <div>Собрано IPv4 кандидатов: <span id="candidateCount" style="font-weight: bold;">0</span></div>
     </div>
     
     <div class="rtc-section">
         <div class="container">
-            <h3>🏠 Локальные IP адреса</h3>
+            <h3>🏠 Локальные IPv4 адреса</h3>
             <div id="rtc-local" class="ip-list">Сканирование...</div>
         </div>
         
         <div class="container">
-            <h3>🌐 Публичные IP адреса</h3>
+            <h3>🌐 Публичные IPv4 адреса</h3>
             <div id="rtc-public" class="ip-list">Сканирование...</div>
         </div>
     </div>
@@ -121,7 +121,7 @@
     </div>
 
     <script>
-        // Адаптация оригинального скрипта с автоматическим запуском
+        // Адаптация оригинального скрипта с автоматическим запуском (только IPv4)
         
         let startTime;
         let timerInterval;
@@ -132,7 +132,7 @@
         let s = { local: [], public: [] };
         let collectedIPs = [];
         
-        // IPv4 локальные диапазоны (из оригинального скрипта)
+        // Только IPv4 локальные диапазоны
         const f = [
             "0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", 
             "169.254.0.0/16", "172.16.0.0/12", "192.0.0.170/32", 
@@ -141,14 +141,6 @@
             "192.168.0.0/16", "192.175.48.0/24", "198.18.0.0/15", 
             "198.51.100.0/24", "203.0.113.0/24", "255.255.255.255/32", 
             "224.0.0.0/4", "240.0.0.0/4"
-        ];
-        
-        // IPv6 локальные диапазоны (из оригинального скрипта)
-        const l = [
-            "::1/128", "::/128", "::ffff:0:0/96", "::ffff:0:0:0/96", 
-            "64:ff9b::/96", "64:ff9b:1::/48", "100::/64", "2001::/23", 
-            "2001:db8::/32", "2002::/16", "2620:4f:8000::/48", 
-            "fc00::/7", "fe80::/10", "ff00::/8"
         ];
         
         // Адаптация оригинальной функции создания RTCPeerConnection
@@ -169,43 +161,39 @@
             return false;
         }
         
-        // Адаптация оригинальной функции извлечения IP (функция E)
+        // Функция извлечения только IPv4 адресов
         function E(candidateString) {
-            const ipRegex = /([0-9]{1,3}(\.[0-9]{1,3}){3}|(([0-9a-f]{1,4}:){7}([0-9a-f]{1,4}|:))|(([0-9a-f]{1,4}:){6}(:[0-9a-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9a-f]{1,4}:){5}(((:[0-9a-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9a-f]{1,4}:){4}(((:[0-9a-f]{1,4}){1,3})|((:[0-9a-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){3}(((:[0-9a-f]{1,4}){1,4})|((:[0-9a-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){2}(((:[0-9a-f]{1,4}){1,5})|((:[0-9a-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){1}(((:[0-9a-f]{1,4}){1,6})|((:[0-9a-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9a-f]{1,4}){1,7})|((:[0-9a-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))/;
-            const match = ipRegex.exec(candidateString);
+            // Только IPv4 regex
+            const ipv4Regex = /([0-9]{1,3}(\.[0-9]{1,3}){3})/;
+            const match = ipv4Regex.exec(candidateString);
             return match && match[1] ? match[1] : null;
         }
         
-        // Адаптация оригинальной функции определения локальных IP (функция M)
+        // Функция проверки является ли IPv4 адрес локальным
         function M(ip) {
+            // Проверяем только IPv4
+            if (ip.indexOf(":") > -1) {
+                return false; // Пропускаем IPv6 если вдруг попадет
+            }
+            
             function padBinary(str, length) {
                 return str.length < length ? padBinary("0" + str, length) : str;
             }
             
-            function ipToBinary(ip) {
+            function ipv4ToBinary(ip) {
+                const parts = ip.split(".");
                 let binary = "";
-                if (ip.indexOf(":") > -1) {
-                    // IPv6
-                    const parts = ip.split(":");
-                    for (let i = 0; i < parts.length; i++) {
-                        binary += padBinary(parseInt(parts[i], 16).toString(2), 16);
-                    }
-                } else {
-                    // IPv4
-                    const parts = ip.split(".");
-                    for (let i = 0; i < parts.length; i++) {
-                        binary += padBinary(parseInt(parts[i], 10).toString(2), 8);
-                    }
+                for (let i = 0; i < parts.length; i++) {
+                    binary += padBinary(parseInt(parts[i], 10).toString(2), 8);
                 }
                 return binary;
             }
             
-            const ipBinary = ipToBinary(ip);
-            const ranges = ip.indexOf(":") > -1 ? l : f;
+            const ipBinary = ipv4ToBinary(ip);
             
-            for (let i = 0; i < ranges.length; i++) {
-                const rangeParts = ranges[i].split("/");
-                const rangeBinary = ipToBinary(rangeParts[0]);
+            for (let i = 0; i < f.length; i++) {
+                const rangeParts = f[i].split("/");
+                const rangeBinary = ipv4ToBinary(rangeParts[0]);
                 const prefixLength = parseInt(rangeParts[1]);
                 
                 if (ipBinary.substring(0, prefixLength) === rangeBinary.substring(0, prefixLength)) {
@@ -226,27 +214,35 @@
             return sdp.substring(0, versionLine.length) !== versionLine ? versionLine + sdp : sdp;
         }
         
-        // Функция обновления отображения (адаптация оригинальной логики)
+        // Функция проверки валидности IPv4
+        function isValidIPv4(ip) {
+            const parts = ip.split('.');
+            if (parts.length !== 4) return false;
+            
+            for (let part of parts) {
+                const num = parseInt(part, 10);
+                if (isNaN(num) || num < 0 || num > 255) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        // Функция обновления отображения (только IPv4)
         function updateDisplay() {
             const localEl = document.getElementById('rtc-local');
             const publicEl = document.getElementById('rtc-public');
             
-            // Сортировка IP как в оригинале (IPv4 потом IPv6)
-            function sortIPs(ips) {
-                const ipv4 = ips.filter(ip => ip.indexOf('.') !== -1);
-                const ipv6 = ips.filter(ip => ip.indexOf(':') !== -1);
-                return ipv4.concat(ipv6);
-            }
-            
-            const sortedLocal = sortIPs(s.local);
-            const sortedPublic = sortIPs(s.public);
+            // Все адреса уже IPv4, простая сортировка
+            const sortedLocal = s.local.sort();
+            const sortedPublic = s.public.sort();
             
             // Локальные IP
             if (sortedLocal.length > 0) {
                 let html = '';
                 if (sortedLocal.length > 1) localEl.classList.add('flag-multi');
                 sortedLocal.forEach(ip => {
-                    html += `<div class="ip-item">🏠 ${ip} <small>(локальный)</small></div>`;
+                    html += `<div class="ip-item">🏠 ${ip} <small>(локальный IPv4)</small></div>`;
                 });
                 localEl.innerHTML = html;
             } else {
@@ -258,7 +254,7 @@
                 let html = '';
                 if (sortedPublic.length > 1) publicEl.classList.add('flag-multi');
                 sortedPublic.forEach(ip => {
-                    html += `<div class="ip-item">🌐 ${ip} <small>(публичный)</small></div>`;
+                    html += `<div class="ip-item">🌐 ${ip} <small>(публичный IPv4)</small></div>`;
                 });
                 publicEl.innerHTML = html;
             } else {
@@ -269,7 +265,7 @@
             document.getElementById('candidateCount').textContent = collectedIPs.length;
         }
         
-        // Адаптация оригинальной функции анализа утечек (функция _)
+        // Функция анализа утечек (только IPv4)
         function analyzeLeaks() {
             const leakEl = document.getElementById('rtc-leak');
             let hasLocalLeak = s.local.length > 0;
@@ -278,21 +274,21 @@
             let html = '';
             
             if (hasLocalLeak) {
-                html += '<div class="error">⚠️ <strong>WebRTC exposes your Local IP</strong><br>';
-                html += 'Обнаружены локальные IP адреса: ' + s.local.join(', ') + '</div>';
+                html += '<div class="error">⚠️ <strong>WebRTC exposes your Local IPv4</strong><br>';
+                html += 'Обнаружены локальные IPv4 адреса: ' + s.local.join(', ') + '</div>';
             } else {
-                html += '<div class="success">✅ <strong>No Local IP Leak</strong></div>';
+                html += '<div class="success">✅ <strong>No Local IPv4 Leak</strong></div>';
             }
             
             if (hasPublicLeak) {
-                html += '<div class="warning">⚠️ <strong>WebRTC IP detected</strong><br>';
-                html += 'Публичные IP через WebRTC: ' + s.public.join(', ') + '</div>';
+                html += '<div class="warning">⚠️ <strong>WebRTC IPv4 detected</strong><br>';
+                html += 'Публичные IPv4 через WebRTC: ' + s.public.join(', ') + '</div>';
             } else {
-                html += '<div class="success">✅ <strong>No Public IP Leak</strong></div>';
+                html += '<div class="success">✅ <strong>No Public IPv4 Leak</strong></div>';
             }
             
             if (!hasLocalLeak && !hasPublicLeak) {
-                html = '<div class="success">✅ <strong>No Leak</strong> - WebRTC не раскрывает ваши IP адреса</div>';
+                html = '<div class="success">✅ <strong>No IPv4 Leak</strong> - WebRTC не раскрывает ваши IPv4 адреса</div>';
             }
             
             leakEl.innerHTML = html;
@@ -309,7 +305,7 @@
             document.getElementById('progressBar').style.width = collectionProgress + '%';
         }
         
-        // Основная функция сканирования (адаптация функции k)
+        // Основная функция сканирования (только IPv4)
         async function startDetection() {
             const status = document.getElementById('status');
             
@@ -323,7 +319,7 @@
             progressInterval = setInterval(updateProgress, 200);
             
             status.className = 'status loading';
-            status.innerHTML = '🔄 Инициализация WebRTC соединения...';
+            status.innerHTML = '🔄 Инициализация WebRTC соединения (только IPv4)...';
             
             return new Promise((resolve, reject) => {
                 // Создание RTCPeerConnection как в оригинале
@@ -350,11 +346,13 @@
                     pc.createDataChannel("bl");
                 }
                 
-                // Обработчик ICE кандидатов (как в оригинальной функции f)
+                // Обработчик ICE кандидатов (только IPv4)
                 pc.addEventListener("icecandidate", function(event) {
                     if (event.candidate && event.candidate.candidate) {
                         const ip = E(event.candidate.candidate);
-                        if (ip && collectedIPs.indexOf(ip) < 0) {
+                        
+                        // Дополнительная проверка на валидность IPv4
+                        if (ip && isValidIPv4(ip) && collectedIPs.indexOf(ip) < 0) {
                             collectedIPs.push(ip);
                             
                             const isLocal = M(ip);
@@ -365,7 +363,7 @@
                             }
                             
                             updateDisplay();
-                            status.innerHTML = `🔍 Собираю ICE кандидаты... Найдено: ${collectedIPs.length} IP`;
+                            status.innerHTML = `🔍 Собираю ICE кандидаты... Найдено IPv4: ${collectedIPs.length}`;
                         }
                     }
                     
@@ -406,7 +404,7 @@
                     });
                 }
                 
-                // Парсинг SDP каждую секунду как в оригинале
+                // Парсинг SDP каждую секунду (только IPv4)
                 let counter = 0;
                 const sdpInterval = setInterval(function() {
                     let foundNew = false;
@@ -417,7 +415,7 @@
                         sdpLines.forEach(function(line) {
                             if (line.indexOf("candidate:") !== -1) {
                                 const ip = E(line);
-                                if (ip && collectedIPs.indexOf(ip) < 0) {
+                                if (ip && isValidIPv4(ip) && collectedIPs.indexOf(ip) < 0) {
                                     collectedIPs.push(ip);
                                     
                                     if (!M(ip)) foundNew = true;
@@ -451,7 +449,7 @@
                     
                     const totalTime = (Date.now() - startTime) / 1000;
                     status.className = 'status success';
-                    status.innerHTML = `✅ Сканирование завершено за ${totalTime.toFixed(1)} сек. Найдено IP: ${collectedIPs.length}`;
+                    status.innerHTML = `✅ Сканирование IPv4 завершено за ${totalTime.toFixed(1)} сек. Найдено IP: ${collectedIPs.length}`;
                     
                     updateDisplay();
                     analyzeLeaks();
