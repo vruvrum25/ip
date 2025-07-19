@@ -15,9 +15,6 @@
             font-size: 16px;
             line-height: 1.5;
         }
-        .ip-section {
-            margin: 5px 0;
-        }
     </style>
 </head>
 <body>
@@ -27,94 +24,71 @@
 async function checkUDP() {
     const startTime = Date.now();
     
-    try {
-        const pc = new RTCPeerConnection({
-            iceServers: [{urls: "stun:stun.l.google.com:19302"}]
+    const servers = [
+        {urls: "stun:stun.l.google.com:19302"},
+        {urls: "stun:stun2.l.google.com:19302"}
+    ];
+    
+    let completed = false;
+    const allIps = new Set();
+    const connections = [];
+    
+    function cleanup() {
+        connections.forEach(pc => {
+            try { pc.close(); } catch(e) {}
         });
+    }
+    
+    function showResult() {
+        if (completed) return;
+        completed = true;
+        cleanup();
         
-        pc.createDataChannel("");
+        const duration = Date.now() - startTime;
+        const resultDiv = document.getElementById('result');
         
-        const localIPs = new Set();
-        const publicIPs = new Set();
-        let completed = false;
-        
-        // Функция для определения типа IP
-        function isLocalIP(ip) {
-            return ip.startsWith('192.168.') || 
-                   ip.startsWith('10.') || 
-                   ip.startsWith('172.') && parseInt(ip.split('.')[1]) >= 16 && parseInt(ip.split('.')[1]) <= 31 ||
-                   ip.startsWith('127.') ||
-                   ip.startsWith('169.254.') ||
-                   ip === '0.0.0.0';
+        if (allIps.size === 0) {
+            resultDiv.innerHTML = `UDP заблокирован<br>Время: ${duration}ms (${(duration/1000).toFixed(3)}s)<br>Ваши IP через WebRTC (UDP): не получено`;
+        } else {
+            resultDiv.innerHTML = `UDP работает<br>Время: ${duration}ms (${(duration/1000).toFixed(3)}s)<br>Ваши IP через WebRTC (UDP): ${Array.from(allIps).join(', ')}`;
         }
-        
-        pc.onicecandidate = (evt) => {
-            if (!evt.candidate) return;
+    }
+    
+    // Пробуем оба сервера одновременно
+    servers.forEach(server => {
+        try {
+            const pc = new RTCPeerConnection({iceServers: [server]});
+            connections.push(pc);
             
-            const regex = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g;
-            const found = evt.candidate.candidate.match(regex);
+            pc.createDataChannel("");
             
-            if (found) {
-                found.forEach(ip => {
-                    if (isLocalIP(ip)) {
-                        localIPs.add(ip);
-                    } else {
-                        publicIPs.add(ip);
-                    }
-                });
-            }
-        };
-        
-        pc.onicegatheringstatechange = () => {
-            if (pc.iceGatheringState === "complete" && !completed) {
-                completed = true;
-                pc.close();
-                showResult(localIPs, publicIPs, startTime);
-            }
-        };
-        
-        setTimeout(() => {
-            if (!completed) {
-                completed = true;
-                pc.close();
-                showResult(localIPs, publicIPs, startTime);
-            }
-        }, 3000); // Увеличил время ожидания для получения публичных IP
-        
-        await pc.createOffer().then(offer => pc.setLocalDescription(offer));
-        
-    } catch (error) {
-        showResult(new Set(), new Set(), startTime, true);
-    }
-}
-
-function showResult(localIPs, publicIPs, startTime, error = false) {
-    const duration = Date.now() - startTime;
-    const resultDiv = document.getElementById('result');
+            pc.onicecandidate = (evt) => {
+                if (!evt.candidate || completed) return;
+                const regex = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g;
+                const found = evt.candidate.candidate.match(regex);
+                if (found) {
+                    found.forEach(ip => allIps.add(ip));
+                    showResult(); // Как только получили первый IP - выводим результат
+                }
+            };
+            
+            pc.onicegatheringstatechange = () => {
+                if (pc.iceGatheringState === "complete" && allIps.size > 0) {
+                    showResult();
+                }
+            };
+            
+            pc.createOffer().then(offer => pc.setLocalDescription(offer));
+            
+        } catch (error) {
+            // Игнорируем ошибки отдельных серверов
+        }
+    });
     
-    if (error) {
-        resultDiv.innerHTML = `UDP заблокирован<br>Время: ${duration}ms (${(duration/1000).toFixed(3)}s)<br>Ошибка получения IP через WebRTC`;
-        return;
-    }
-    
-    const hasAnyIP = localIPs.size > 0 || publicIPs.size > 0;
-    const status = hasAnyIP ? 'UDP работает' : 'UDP заблокирован';
-    
-    let ipInfo = '';
-    
-    if (localIPs.size > 0) {
-        ipInfo += `<div class="ip-section"><strong>Локальные IP:</strong> ${Array.from(localIPs).join(', ')}</div>`;
-    }
-    
-    if (publicIPs.size > 0) {
-        ipInfo += `<div class="ip-section"><strong>Публичные IP:</strong> ${Array.from(publicIPs).join(', ')}</div>`;
-    }
-    
-    if (!hasAnyIP) {
-        ipInfo = '<div class="ip-section">IP адреса не получены</div>';
-    }
-    
-    resultDiv.innerHTML = `${status}<br>Время: ${duration}ms (${(duration/1000).toFixed(3)}s)<br>${ipInfo}`;
+    // Таймаут на случай если ни один сервер не ответит
+    setTimeout(() => {
+        showResult();
+    }, 3000);
 }
 
 checkUDP();
