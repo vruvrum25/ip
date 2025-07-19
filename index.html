@@ -2,93 +2,80 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UDP Test</title>
+    <title>UDP Check</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: white;
-            margin: 50px;
-            text-align: center;
+        body { 
+            background: white; 
+            color: black; 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            margin: 0;
         }
-        .result {
-            font-size: 24px;
-            margin: 20px 0;
-        }
-        .time {
-            font-size: 18px;
-            color: #666;
+        #result {
+            font-size: 16px;
+            line-height: 1.5;
         }
     </style>
 </head>
 <body>
-    <div id="result" class="result">Проверка UDP...</div>
-    <div id="time" class="time"></div>
+    <div id="result">Проверяем...</div>
 
-    <script type="module">
-        (async () => {
-            const startTime = performance.now();
-            
-            try {
-                // Быстрая проверка UDP блокировки
-                const isUDPBlocked = await new Promise((resolve) => {
-                    const timeout = setTimeout(() => resolve(true), 2000); // 2 сек таймаут
-                    let resolved = false; // Флаг для предотвращения двойного resolve
-                    
-                    try {
-                        const pc = new RTCPeerConnection({
-                            iceServers: [
-                                { urls: 'stun:stun.sipnet.ru:3478' },      // Российский первым
-                                { urls: 'stun:stun.l.google.com:19302' }   // Google вторым
-                            ]
-                        });
-                        
-                        pc.onicecandidate = (e) => {
-                            if (!resolved && e.candidate && e.candidate.candidate.includes('udp')) {
-                                resolved = true;
-                                clearTimeout(timeout);
-                                resolve(false); // UDP работает - первый же ответ
-                            }
-                        };
-                        
-                        pc.onicegatheringstatechange = () => {
-                            if (!resolved && pc.iceGatheringState === 'complete') {
-                                resolved = true;
-                                clearTimeout(timeout);
-                                resolve(true); // UDP заблокирован
-                            }
-                        };
-                        
-                        pc.createDataChannel('');
-                        pc.createOffer().then(o => pc.setLocalDescription(o)).catch(() => {
-                            if (!resolved) {
-                                resolved = true;
-                                clearTimeout(timeout);
-                                resolve(true);
-                            }
-                        });
-                    } catch {
-                        if (!resolved) {
-                            resolved = true;
-                            clearTimeout(timeout);
-                            resolve(true);
-                        }
-                    }
-                });
-                
-                const endTime = performance.now();
-                const totalTime = endTime - startTime;
-                const seconds = (totalTime / 1000).toFixed(3);
-                
-                // Отображение результата
-                document.getElementById('result').textContent = isUDPBlocked ? 'UDP заблокирован' : 'UDP работает';
-                document.getElementById('time').textContent = `Время: ${Math.round(totalTime)}ms (${seconds}s)`;
-                
-            } catch (err) {
-                document.getElementById('result').textContent = 'Ошибка проверки';
-                document.getElementById('time').textContent = 'Время: -';
+<script>
+async function checkUDP() {
+    const startTime = Date.now();
+    
+    try {
+        const pc = new RTCPeerConnection({
+            iceServers: [{urls: "stun:stun.l.google.com:19302"}]
+        });
+        
+        pc.createDataChannel("");
+        
+        const ips = new Set();
+        let completed = false;
+        
+        pc.onicecandidate = (evt) => {
+            if (!evt.candidate) return;
+            const regex = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g;
+            const found = evt.candidate.candidate.match(regex);
+            if (found) found.forEach(ip => ips.add(ip));
+        };
+        
+        pc.onicegatheringstatechange = () => {
+            if (pc.iceGatheringState === "complete" && !completed) {
+                completed = true;
+                pc.close();
+                showResult(ips, startTime);
             }
-        })();
-    </script>
+        };
+        
+        setTimeout(() => {
+            if (!completed) {
+                completed = true;
+                pc.close();
+                showResult(ips, startTime);
+            }
+        }, 2000);
+        
+        await pc.createOffer().then(offer => pc.setLocalDescription(offer));
+        
+    } catch (error) {
+        showResult(new Set(), startTime, true);
+    }
+}
+
+function showResult(ips, startTime, error = false) {
+    const duration = Date.now() - startTime;
+    const resultDiv = document.getElementById('result');
+    
+    if (error || ips.size === 0) {
+        resultDiv.innerHTML = `UDP заблокирован<br>Время: ${duration}ms (${(duration/1000).toFixed(3)}s)<br>Ваши IP через WebRTC (UDP): не получено`;
+    } else {
+        resultDiv.innerHTML = `UDP работает<br>Время: ${duration}ms (${(duration/1000).toFixed(3)}s)<br>Ваши IP через WebRTC (UDP): ${Array.from(ips).join(', ')}`;
+    }
+}
+
+checkUDP();
+</script>
 </body>
 </html>
