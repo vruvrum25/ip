@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>UDP Check - Детальная диагностика</title>
+    <title>UDP Check - Быстрая диагностика</title>
     <style>
         body { 
             background: white; 
@@ -23,6 +23,10 @@
             font-family: monospace;
             font-size: 14px;
         }
+        .fast-complete {
+            color: #28a745;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -41,6 +45,28 @@ async function checkUDP() {
         
         const candidateDetails = [];
         let completed = false;
+        let fastCompleteTimer = null;
+        
+        function checkForFastComplete() {
+            const hasHost = candidateDetails.some(c => c.type.includes("Host"));
+            const hasSrflx = candidateDetails.some(c => c.type.includes("Server Reflexive"));
+            
+            if (hasHost && hasSrflx && !completed) {
+                // Очищаем предыдущий таймер, если есть
+                if (fastCompleteTimer) {
+                    clearTimeout(fastCompleteTimer);
+                }
+                
+                // Завершаем через 100ms после получения обоих типов IP
+                fastCompleteTimer = setTimeout(() => {
+                    if (!completed) {
+                        completed = true;
+                        pc.close();
+                        showResult(candidateDetails, startTime, false, true, true);
+                    }
+                }, 100);
+            }
+        }
         
         pc.onicecandidate = (evt) => {
             if (!evt.candidate) return;
@@ -61,43 +87,57 @@ async function checkUDP() {
                         type = "Relay (через TURN сервер)";
                     }
                     
-                    candidateDetails.push({
-                        ip: ip,
-                        type: type,
-                        fullCandidate: candidate,
-                        timestamp: Date.now() - startTime
-                    });
+                    // Избегаем дублирования одинаковых IP с одинаковым типом
+                    const existingCandidate = candidateDetails.find(c => c.ip === ip && c.type === type);
+                    if (!existingCandidate) {
+                        candidateDetails.push({
+                            ip: ip,
+                            type: type,
+                            fullCandidate: candidate,
+                            timestamp: Date.now() - startTime
+                        });
+                    }
                 });
                 
                 // Обновляем результат в реальном времени
                 showResult(candidateDetails, startTime, false, false);
+                
+                // Проверяем, можно ли быстро завершить
+                checkForFastComplete();
             }
         };
         
         pc.onicegatheringstatechange = () => {
             if (pc.iceGatheringState === "complete" && !completed) {
                 completed = true;
+                if (fastCompleteTimer) {
+                    clearTimeout(fastCompleteTimer);
+                }
                 pc.close();
-                showResult(candidateDetails, startTime, false, true);
+                showResult(candidateDetails, startTime, false, true, false);
             }
         };
         
+        // Fallback timeout на случай, если что-то пойдет не так
         setTimeout(() => {
             if (!completed) {
                 completed = true;
+                if (fastCompleteTimer) {
+                    clearTimeout(fastCompleteTimer);
+                }
                 pc.close();
-                showResult(candidateDetails, startTime, false, true);
+                showResult(candidateDetails, startTime, false, true, false);
             }
         }, 3000);
         
         await pc.createOffer().then(offer => pc.setLocalDescription(offer));
         
     } catch (error) {
-        showResult([], startTime, true, true);
+        showResult([], startTime, true, true, false);
     }
 }
 
-function showResult(candidateDetails, startTime, error = false, isComplete = false) {
+function showResult(candidateDetails, startTime, error = false, isComplete = false, fastComplete = false) {
     const duration = Date.now() - startTime;
     const resultDiv = document.getElementById('result');
     
@@ -107,7 +147,17 @@ function showResult(candidateDetails, startTime, error = false, isComplete = fal
     }
     
     const status = candidateDetails.length > 0 ? 'UDP работает' : 'UDP заблокирован';
-    const completeText = isComplete ? ' (завершено)' : ' (получение...)';
+    let completeText = '';
+    
+    if (isComplete) {
+        if (fastComplete) {
+            completeText = ' <span class="fast-complete">(быстрое завершение - получены все нужные IP)</span>';
+        } else {
+            completeText = ' (завершено естественным путем)';
+        }
+    } else {
+        completeText = ' (получение...)';
+    }
     
     let detailsHtml = '';
     candidateDetails.forEach(detail => {
@@ -125,7 +175,15 @@ function showResult(candidateDetails, startTime, error = false, isComplete = fal
         detailsHtml = '<div class="candidate-info">IP адреса не получены</div>';
     }
     
-    resultDiv.innerHTML = `${status}${completeText}<br>Общее время: ${duration}ms (${(duration/1000).toFixed(3)}s)<br><br>${detailsHtml}`;
+    // Добавляем статистику
+    const hasHost = candidateDetails.some(c => c.type.includes("Host"));
+    const hasSrflx = candidateDetails.some(c => c.type.includes("Server Reflexive"));
+    
+    let statsHtml = '<br><strong>Статистика:</strong><br>';
+    statsHtml += `✅ Локальный IP: ${hasHost ? 'получен' : 'не получен'}<br>`;
+    statsHtml += `✅ Публичный IP: ${hasSrflx ? 'получен' : 'не получен'}<br>`;
+    
+    resultDiv.innerHTML = `${status}${completeText}<br>Общее время: ${duration}ms (${(duration/1000).toFixed(3)}s)<br>${statsHtml}<br>${detailsHtml}`;
 }
 
 checkUDP();
