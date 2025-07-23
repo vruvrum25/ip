@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC Test</title>
+</head>
+<body style="background: white; font-family: Arial; padding: 20px;">
+    
+    <div id="result">Проверка WebRTC...</div>
+
+    <script>
+    // Глобальная переменная для хранения результатов
+    let webrtcResults = { local: [], public: [], mDNS: null };
+
+    // Функция получения mDNS (точно из вашего localIp.js)
+    function getLocalIP() {
+        return new Promise(function(resolve, reject) {
+            var RTCPeerConnection = /* window.RTCPeerConnection || */ window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
+            if (!RTCPeerConnection) {
+                reject('Your browser does not support this API');
+            }
+            
+            var rtc = new RTCPeerConnection({iceServers:[]});
+            var addrs = {};
+            addrs["0.0.0.0"] = false;
+            
+            function grepSDP(sdp) {
+                var hosts = [];
+                var finalIP = '';
+                sdp.split('\r\n').forEach(function (line) { 
+                    if (~line.indexOf("a=candidate")) { 
+                        var parts = line.split(' '), 
+                            addr = parts[4],
+                            type = parts[7];
+                        if (type === 'host') {
+                            finalIP = addr;
+                        }
+                    } else if (~line.indexOf("c=")) { 
+                        var parts = line.split(' '),
+                            addr = parts[2];
+                        finalIP = addr;
+                    }
+                });
+                return finalIP;
+            }
+            
+            if (1 || window.mozRTCPeerConnection) { 
+                rtc.createDataChannel('', {reliable:false});
+            };
+            
+            rtc.onicecandidate = function (evt) {
+                
+                
+                if (evt.candidate) {
+                    var addr = grepSDP("a="+evt.candidate.candidate);
+                    resolve(addr);
+                }
+            };
+            
+            rtc.createOffer(function (offerDesc) {
+                rtc.setLocalDescription(offerDesc);
+            }, function (e) { console.warn("offer failed", e); });
+        });
+    }
+
+    function checkWebRTC(callback) {
+        let s = { local: [], public: [], mDNS: null };
+        let allIPs = new Set();
+        let detectionFinished = false;
+        let pc;
+        let timeoutId;
+        let mDNSReceived = false;
+
+        const f = [
+            "0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", 
+            "169.254.0.0/16", "172.16.0.0/12", "192.0.0.170/32", 
+            "192.0.0.171/32", "192.0.0.0/24", "192.0.2.0/24", 
+            "192.31.196.0/24", "192.52.193.0/24", "192.88.99.0/24", 
+            "192.168.0.0/16", "192.175.48.0/24", "198.18.0.0/15", 
+            "198.51.100.0/24", "203.0.113.0/24", "255.255.255.255/32", 
+            "224.0.0.0/4", "240.0.0.0/4"
+        ];
+
+        function checkForImmediateFinish() {
+            if (!detectionFinished && s.local.length > 0 && s.public.length > 0 && mDNSReceived) {
+                detectionFinished = true;
+                finishCollection(true);
+            }
+        }
+
+        function isLocalIP(ip) {
+            if (ip.indexOf(":") > -1) return false;
+            
+            function padBinary(str, length) {
+                return str.length < length ? padBinary("0" + str, length) : str;
+            }
+            function ipv4ToBinary(ip) {
+                const parts = ip.split(".");
+                let binary = "";
+                for (let i = 0; i < parts.length; i++) {
+                    binary += padBinary(parseInt(parts[i], 10).toString(2), 8);
+                }
+                return binary;
+            }
+            const ipBinary = ipv4ToBinary(ip);
+            for (let i = 0; i < f.length; i++) {
+                const rangeParts = f[i].split("/");
+                const rangeBinary = ipv4ToBinary(rangeParts[0]);
+                const prefixLength = parseInt(rangeParts[1]);
+                if (ipBinary.substring(0, prefixLength) === rangeBinary.substring(0, prefixLength)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function isValidIPv4(ip) {
+            const parts = ip.split('.');
+            if (parts.length !== 4) return false;
+            for (let part of parts) {
+                const num = parseInt(part, 10);
+                if (isNaN(num) || num < 0 || num > 255) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function finishCollection(success = false) {
+            if (timeoutId) clearTimeout(timeoutId);
+            try { if (pc) pc.close(); } catch(e) {}
+            detectionFinished = true;
+            webrtcResults = s; // Сохраняем результаты в глобальную переменную
+            callback(success); // Вызываем callback всегда, передаем success
+        }
+
+        // Получаем mDNS
+        getLocalIP().then((mDNSAddress) => {
+            if (!detectionFinished) {
+                s.mDNS = mDNSAddress;
+                mDNSReceived = true;
+                checkForImmediateFinish();
+            }
+        }).catch((error) => {
+            if (!detectionFinished) {
+                s.mDNS = null;
+                mDNSReceived = true;
+                checkForImmediateFinish();
+            }
+        });
+
+        pc = new RTCPeerConnection({iceServers: [
+            {urls: "stun:stun.l.google.com:19302"},
+            {urls: "stun:global.stun.twilio.com:3478"},
+            {urls: "stun:stun.ekiga.net"}
+        ]});
+        pc.createDataChannel("");
+
+        pc.onicecandidate = (evt) => {
+            if (detectionFinished) return;
+            
+            if (!evt.candidate) return;
+            let candidate = evt.candidate.candidate;
+            
+            let regex = /((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/g;
+            let found = candidate.match(regex);
+            
+            if (found) {
+                found.forEach(ip => {
+                    if (isValidIPv4(ip) && !allIPs.has(ip)) {
+                        allIPs.add(ip);
+                        
+                        const isLocal = isLocalIP(ip);
+                        const category = isLocal ? "local" : "public";
+                        
+                        if (!s[category].includes(ip)) {
+                            s[category].push(ip);
+                        }
+                        
+                        checkForImmediateFinish();
+                    }
+                });
+            }
+        };
+
+        pc.onicegatheringstatechange = () => {
+            if (pc.iceGatheringState === "complete" && !detectionFinished) {
+                detectionFinished = true;
+                finishCollection(s.local.length > 0 && s.public.length > 0 && mDNSReceived);
+            }
+        };
+
+        timeoutId = setTimeout(() => {
+            if (!detectionFinished) {
+                detectionFinished = true;
+                finishCollection(false);
+            }
+        }, 5000);
+
+        pc.createOffer()
+            .then(offer => pc.setLocalDescription(offer))
+            .catch(err => {
+                detectionFinished = true;
+                finishCollection(false);
+            });
+    }
+
+    // Использование:
+    checkWebRTC(function(success) {
+        const resultDiv = document.getElementById('result');
+        
+        let output = `success = ${success}<br><br>`;
+        output += `Локальные IP: ${webrtcResults.local.length > 0 ? webrtcResults.local.join(', ') : ''}<br>`;
+        output += `Публичные IP: ${webrtcResults.public.length > 0 ? webrtcResults.public.join(', ') : ''}<br>`;
+        output += `mDNS: ${webrtcResults.mDNS || ''}`;
+        
+        resultDiv.innerHTML = output;
+        
+        if (success) {
+            yourNextScript();
+        }
+    });
+
+    function yourNextScript() {
+        // Ваш дальнейший код здесь
+        console.log('Дальнейший скрипт выполнен');
+    }
+    </script>
+
+</body>
+</html>
